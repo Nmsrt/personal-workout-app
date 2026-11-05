@@ -562,7 +562,6 @@ h1.display { font-size: 2.75rem; }
 .rc-active { background: var(--signal); color: var(--on-signal); margin: 2px 0 0; flex-shrink: 0; }
 .rc-meta { display: flex; gap: 14px; margin-top: 8px; font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rc-meta b { color: var(--ink); font-weight: 700; }
-.rc-preview { margin-top: 10px; font-size: 0.875rem; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .rc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); }
 .back-link { margin-left: -6px; color: var(--muted); }
 .screen > .back-link + .topbar { margin-top: 2px; }

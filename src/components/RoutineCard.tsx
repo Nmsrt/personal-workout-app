@@ -43,7 +43,6 @@ export function RoutineCard({ r, active, settings, history, onClick, expanded, c
             ~<b>{estimateMin(r, settings)}</b> min
           </span>
         </div>
-        {!expanded && <div className="rc-preview">{r.exercises.length ? r.exercises.map((e) => e.name).join(' · ') : 'No exercises yet'}</div>}
         <div className="rc-foot">
           <span className="muted small">{lastDoneLabel(history, r.id)}</span>
           <span className="rc-chev">
