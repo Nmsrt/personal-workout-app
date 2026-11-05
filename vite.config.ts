@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['apple-touch-icon.png'],
       manifest: {
         name: 'Workout Tracker',
         short_name: 'Workout',
