@@ -25,7 +25,7 @@ export async function checkReminder(d: AppData, now = Date.now()) {
   const body = 'Your routine is waiting. Keep the streak going!'
   try {
     const reg = await navigator.serviceWorker?.getRegistration()
-    if (reg) await reg.showNotification(title, { body, icon: 'icon-192.png', tag: 'daily-reminder' })
+    if (reg) await reg.showNotification(title, { body, icon: 'icon-192.png', badge: 'badge-96.png', tag: 'daily-reminder' })
     else new Notification(title, { body, icon: 'icon-192.png' })
   } catch {
     /* ignore */
