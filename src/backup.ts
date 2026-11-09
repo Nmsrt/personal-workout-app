@@ -6,7 +6,7 @@ export const SNOOZE_DAYS = 7
 /** never backed up: start nudging after this many workouts */
 export const FIRST_NUDGE_WORKOUTS = 3
 
-/** Whether to show the backup reminder on Today. */
+/** Whether to show the backup reminder on Home. */
 export function backupDue(d: AppData, now = Date.now()): boolean {
   if (d.backupSnoozeUntil && now < d.backupSnoozeUntil) return false
   if (!d.lastBackup) return d.history.length >= FIRST_NUDGE_WORKOUTS

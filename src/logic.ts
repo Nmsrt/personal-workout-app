@@ -11,18 +11,14 @@ export function estimateMin(r: Routine, s: Settings): number {
     sec += ex.sets * work + Math.max(0, ex.sets - 1) * restFor(ex, s)
     if (i < r.exercises.length - 1) sec += restFor(ex, s)
   })
-  if (s.useWarmup) sec += r.warmup.reduce((a, x) => a + x.duration, 0)
-  if (s.useCooldown) sec += r.cooldown.reduce((a, x) => a + x.duration, 0)
   return Math.max(1, Math.round(sec / 60))
 }
 
-export function buildSteps(r: Routine, s: Pick<Settings, 'useWarmup' | 'useCooldown'>): Step[] {
+export function buildSteps(r: Routine): Step[] {
   const steps: Step[] = []
-  if (s.useWarmup) r.warmup.forEach((stretch) => steps.push({ kind: 'warm', stretch }))
   r.exercises.forEach((ex, exIdx) => {
-    for (let setIdx = 0; setIdx < ex.sets; setIdx++) steps.push({ kind: 'set', exIdx, setIdx })
+    for (let setIdx = 0; setIdx < ex.sets; setIdx++) steps.push({ exIdx, setIdx })
   })
-  if (s.useCooldown) r.cooldown.forEach((stretch) => steps.push({ kind: 'cool', stretch }))
   return steps
 }
 
@@ -119,6 +115,30 @@ export function suggestions(r: Routine, last: Workout | undefined, units: Settin
   return out
 }
 
+/** Weekday labels, Monday first (index = weekday index). */
+export const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+/** Weekday index with Monday = 0 … Sunday = 6. */
+export const weekdayIndex = (ts: number) => (new Date(ts).getDay() + 6) % 7
+
+/** Routines planned for the weekday of `ts`, in their list order. */
+export function scheduledOn<T extends Pick<Routine, 'days'>>(routines: T[], ts: number): T[] {
+  const d = weekdayIndex(ts)
+  return routines.filter((r) => r.days?.includes(d))
+}
+
+/** Short label for a set of weekdays: "Mon, Wed, Fri", "Weekdays", "Every day", or "" when unscheduled. Expects `days` unique and sorted (the store keeps them that way). */
+export function formatDays(days: number[] | undefined): string {
+  const set = days ?? []
+  if (set.length === 0) return ''
+  if (set.length === 7) return 'Every day'
+  if (set.join() === '0,1,2,3,4') return 'Weekdays'
+  if (set.join() === '5,6') return 'Weekends'
+  return set.map((d) => DAY_SHORT[d]).join(', ')
+}
+
 /** Monday 00:00 local of the week containing ts. */
 export function weekStart(ts: number): number {
   const d = new Date(ts)
@@ -135,11 +155,7 @@ export function workoutsThisWeek(history: Workout[], now = Date.now()): number {
 
 /** Consecutive weeks meeting the weekly goal. Current week counts once met; an unmet current week doesn't break it. */
 export function weekStreak(history: Workout[], goal: number, now = Date.now()): number {
-  const counts = new Map<number, number>()
-  for (const w of history) {
-    const k = weekStart(w.start)
-    counts.set(k, (counts.get(k) ?? 0) + 1)
-  }
+  const counts = countByWeek(history)
   let streak = 0
   let ws = weekStart(now)
   if ((counts.get(ws) ?? 0) >= goal) streak++
@@ -153,36 +169,59 @@ export function weekStreak(history: Workout[], goal: number, now = Date.now()): 
   return streak
 }
 
-export interface ExerciseSummary {
-  id: string
-  name: string
-  type: Exercise['type']
-  points: { t: number; topWeight: number; totalReps: number; best: number }[]
-  pr: { score: number; set: { reps: number; weight: number; duration: number }; t: number } | null
+/** Totals for the calendar month containing `now`. */
+export function monthStats(history: Workout[], now = Date.now()) {
+  const d = new Date(now)
+  const from = new Date(d.getFullYear(), d.getMonth(), 1).getTime()
+  const to = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime()
+  const prevFrom = new Date(d.getFullYear(), d.getMonth() - 1, 1).getTime()
+  const inMonth = history.filter((w) => w.start >= from && w.start < to)
+  const days = new Set(inMonth.map((w) => new Date(w.start).toDateString()))
+  return {
+    workouts: inMonth.length,
+    prevWorkouts: history.filter((w) => w.start >= prevFrom && w.start < from).length,
+    activeDays: days.size,
+    minutes: Math.round(inMonth.reduce((a, w) => a + Math.max(0, w.end - w.start), 0) / 60000),
+    sets: inMonth.reduce((a, w) => a + w.exercises.reduce((b, e) => b + e.sets.length, 0), 0),
+    prs: inMonth.reduce((a, w) => a + w.prs.length, 0),
+    /** any workout before this month, so a month-over-month delta means something */
+    hasEarlier: history.some((w) => w.start < from)
+  }
 }
 
-export function exerciseSeries(history: Workout[]): ExerciseSummary[] {
-  const map = new Map<string, ExerciseSummary>()
-  const sorted = [...history].sort((a, b) => a.start - b.start)
-  for (const w of sorted) {
-    for (const log of w.exercises) {
-      let s = map.get(log.exerciseId)
-      if (!s) {
-        s = { id: log.exerciseId, name: log.name, type: log.type, points: [], pr: null }
-        map.set(log.exerciseId, s)
-      }
-      s.name = log.name
-      s.points.push({
-        t: w.start,
-        topWeight: Math.max(0, ...log.sets.map((x) => x.weight)),
-        totalReps: log.sets.reduce((a, x) => a + x.reps, 0),
-        best: log.type === 'timed' ? Math.max(0, ...log.sets.map((x) => x.duration)) : bestScore(log)
-      })
-      for (const set of log.sets) {
-        const sc = setScore(log.type, set)
-        if (!s.pr || sc > s.pr.score) s.pr = { score: sc, set, t: w.start }
-      }
-    }
+function countByWeek(history: Workout[]): Map<number, number> {
+  const counts = new Map<number, number>()
+  for (const w of history) {
+    const k = weekStart(w.start)
+    counts.set(k, (counts.get(k) ?? 0) + 1)
   }
-  return [...map.values()]
+  return counts
+}
+
+/** Workout counts for the last `n` weeks, oldest first, current week last. */
+export function weeklyCounts(history: Workout[], n: number, now = Date.now()): { start: number; count: number }[] {
+  const counts = countByWeek(history)
+  const out: { start: number; count: number }[] = []
+  const d = new Date(weekStart(now))
+  for (let i = 0; i < n; i++) {
+    const k = weekStart(d.getTime())
+    out.unshift({ start: k, count: counts.get(k) ?? 0 })
+    d.setDate(d.getDate() - 7)
+  }
+  return out
+}
+
+/** Longest run of consecutive weeks meeting the goal, across all history. */
+export function bestWeekStreak(history: Workout[], goal: number): number {
+  if (!history.length) return 0
+  const counts = countByWeek(history)
+  const last = Math.max(...counts.keys())
+  const d = new Date(Math.min(...counts.keys()))
+  let best = 0
+  let run = 0
+  for (let k = weekStart(d.getTime()); k <= last; d.setDate(d.getDate() + 7), k = weekStart(d.getTime())) {
+    run = (counts.get(k) ?? 0) >= goal ? run + 1 : 0
+    best = Math.max(best, run)
+  }
+  return best
 }

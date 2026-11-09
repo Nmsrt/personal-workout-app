@@ -11,13 +11,13 @@ import { SettingsScreen } from './screens/SettingsScreen'
 import { WorkoutScreen } from './screens/WorkoutScreen'
 import { useStore } from './store'
 
+/** 'settings' is reached from the profile button on Home, not the tab bar. */
 type Tab = 'home' | 'routines' | 'history' | 'progress' | 'settings'
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'home', label: 'Today', icon: 'home' },
+  { id: 'home', label: 'Home', icon: 'home' },
   { id: 'routines', label: 'Routines', icon: 'list' },
   { id: 'history', label: 'History', icon: 'calendar' },
-  { id: 'progress', label: 'Progress', icon: 'chart' },
-  { id: 'settings', label: 'Settings', icon: 'sliders' }
+  { id: 'progress', label: 'Progress', icon: 'chart' }
 ]
 
 function useTheme(pref: 'auto' | 'light' | 'dark') {
@@ -61,11 +61,11 @@ export function App() {
   return (
     <div className="app">
       <main key={tab}>
-        {tab === 'home' && <Home onStart={() => setInWorkout(true)} />}
+        {tab === 'home' && <Home onStart={() => setInWorkout(true)} onProfile={() => setTab('settings')} />}
         {tab === 'routines' && <Routines />}
         {tab === 'history' && <History />}
         {tab === 'progress' && <Progress />}
-        {tab === 'settings' && <SettingsScreen />}
+        {tab === 'settings' && <SettingsScreen onBack={() => setTab('home')} />}
       </main>
       <nav className="tabbar" aria-label="Main">
         {TABS.map((t) => (

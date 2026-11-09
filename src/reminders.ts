@@ -1,3 +1,4 @@
+import { scheduledOn } from './logic'
 import type { AppData } from './types'
 import { dayKey } from './util'
 
@@ -8,7 +9,8 @@ export const notificationsSupported = () => typeof window !== 'undefined' && 'No
 /**
  * Browsers can't schedule local notifications without a push server, so this
  * fires while the app (or installed PWA) is open/backgrounded: once per day,
- * after the chosen time, only if no workout was logged today.
+ * after the chosen time, only if no workout was logged today. Once any routine
+ * has planned days, it only reminds on days with a routine planned.
  */
 export async function checkReminder(d: AppData, now = Date.now()) {
   const s = d.settings
@@ -20,9 +22,11 @@ export async function checkReminder(d: AppData, now = Date.now()) {
   at.setHours(h || 0, m || 0, 0, 0)
   if (now < at.getTime()) return
   if (d.history.some((w) => dayKey(w.start) === today)) return
+  const planned = scheduledOn(d.routines, now)
+  if (!planned.length && d.routines.some((r) => r.days?.length)) return
   localStorage.setItem(KEY, today)
   const title = 'Time to work out 💪'
-  const body = 'Your routine is waiting. Keep the streak going!'
+  const body = planned.length ? `${planned.map((r) => r.name).join(' or ')} is planned for today.` : 'Your routine is waiting. Keep the streak going!'
   try {
     const reg = await navigator.serviceWorker?.getRegistration()
     if (reg) await reg.showNotification(title, { body, icon: 'icon-192.png', badge: 'badge-96.png', tag: 'daily-reminder' })

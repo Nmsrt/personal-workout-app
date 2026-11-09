@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Calendar } from '../components/Calendar'
 import { Icon } from '../components/Icon'
+import { PageTitle } from '../components/PageTitle'
 import { useStore } from '../store'
 import { dayKey, fmtDuration, toDisp } from '../util'
 
@@ -10,18 +11,10 @@ export function History() {
   const marked = useMemo(() => new Set(data.history.map((w) => dayKey(w.start))), [data.history])
   const list = [...data.history].sort((a, b) => b.start - a.start).filter((w) => !sel || dayKey(w.start) === sel)
   const u = data.settings.units
-  const totalTime = data.history.reduce((a, w) => a + (w.end - w.start), 0)
 
   return (
     <div className="screen">
-      <header className="topbar">
-        <div>
-          <span className="label">
-            {data.history.length} session{data.history.length === 1 ? '' : 's'} · {fmtDuration(totalTime)}
-          </span>
-          <h1 className="display">History</h1>
-        </div>
-      </header>
+      <PageTitle title="History" />
       <Calendar marked={marked} selected={sel} onSelect={(k) => setSel(sel === k ? null : k)} />
 
       <div>
@@ -52,7 +45,7 @@ export function History() {
                 <div className="grow">
                   <strong>{w.routineName}</strong>
                   <div className="muted small" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} · {fmtDuration(w.end - w.start)} · {w.exercises.reduce((a, e) => a + e.sets.length, 0)} sets
+                    {d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} · {fmtDuration(w.end - w.start)}
                   </div>
                 </div>
                 {w.prs.length > 0 && (

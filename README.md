@@ -2,23 +2,22 @@
 
 A mobile-first workout tracker that works offline and installs on your phone as a Progressive Web App (PWA). It uses React, Vite and TypeScript, with plain CSS. All data stays on your device in `localStorage`. There is no backend and no account.
 
-On first launch it loads five routines built for two 4 kg dumbbells plus bodyweight: **Upper Body & Posture** (the default), **Lower Body & Core**, **Push Day**, **Pull Day** and **Full Body Express**. You can edit every part of them in the app, and each one can be reset to its default.
+On first launch it loads three routines built for two 4 kg dumbbells plus bodyweight: **Upper Body & Posture** (the default), **Lower Body & Core** and **Full Body Express**. You can edit every part of them in the app, and each one can be reset to its default.
 
 ## Features
 
 - **Guided workout.** Shows the current exercise, set X of Y and the target. Reps and weight are pre-filled and can be adjusted. Tap Done to log the set.
 - **Timed exercises** (like the plank). Get-ready countdown, then start / pause / reset, with a sound and vibration at the end.
-- **Automatic rest timer** with +15s and Skip. Back, Skip, previous/next exercise, a progress bar, and a list where you tap any exercise to jump to it.
+- **Automatic rest timer** with +15s and Skip. Back, Skip, a progress bar, and a list where you tap any exercise to jump to it. Bodyweight exercises show only the reps box.
 - **Accurate timers.** They are based on timestamps, so time stays correct when the tab is in the background or the screen is locked.
 - **Screen stays awake** during a workout (Wake Lock API).
 - **Finish summary.** Total time, sets done and new personal records.
 - **Routine editor.** Add, delete, rename and reorder exercises. Per exercise: sets, rep range, weight, rest, notes, and reps or timed. Supports multiple routines, duplicating a routine and resetting the default one.
 - **Form guides.** Each exercise shows an animated silhouette of the movement, drawn as inline SVG so it works offline. The figure is picked from the exercise name, and you can override it in the editor. You can also add your own photo to any exercise; it's compressed to a small JPEG and stored on the device. Turn guides off in Settings. Open the app with `#figures` at the end of the URL to see every illustration on one page.
-- **Optional warm-up and cool-down** stretches with timers, turned on in Settings.
-- **History** with a calendar. **Progress** charts and personal records for each exercise.
+- **History** with a calendar. **Progress** summary: this month's workouts, active days, time and sets, plus weekly consistency (streak, best streak, goal weeks, last 8 weeks chart).
 - **Weekly goal and week streak.**
 - **Progression suggestions.** When you hit the top of the rep range on every set, the app offers to add weight or reps (or 5 s for timed exercises).
-- **Settings.** Sound, vibration, default rest, get-ready time, kg/lb, theme (system/dark/light), daily reminder, and JSON export/import for backups.
+- **Settings** (open from the profile button on Home). Sound, vibration, default rest, get-ready time, kg/lb, theme (system/dark/light), daily reminder, and JSON export/import for backups.
 
 ## Run locally
 
@@ -27,7 +26,7 @@ Requires Node 18 or newer.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # unit tests (vitest)
+npm test           # unit + screen tests (vitest, Testing Library, jsdom)
 ```
 
 ## Use it on your phone
@@ -66,7 +65,7 @@ The build uses relative paths (`base: './'`), so it works at a domain root or in
 
 ## Notes and limitations
 
-- **Data lives in this browser.** Clearing site data deletes it, so use **Settings → Export JSON** for backups. Installing the app on a phone gives it separate storage from the phone's browser tab.
+- **Data lives in this browser.** Clearing site data deletes it, so use **Settings → Backup & storage → Export** for backups. A dot on the Home profile button means a backup is due. Installing the app on a phone gives it separate storage from the phone's browser tab.
 - **Daily reminder.** Without a push server, browsers can't schedule notifications. The reminder fires once a day, after the time you set, while the app is open or in the background, and only if you haven't trained that day.
 - **Vibration** works on Android only. iOS Safari doesn't support it.
 - **Wake Lock** needs HTTPS and a recent browser (Chrome/Edge, or Safari 16.4+).
@@ -83,5 +82,5 @@ src/
   figures/        skeleton rig (forward kinematics) + exercise animations
   reminders.ts    daily notification check
   screens/        Home, WorkoutScreen, Routines, History, Progress, SettingsScreen
-  components/     NumInput/Stepper, Calendar, LineChart
+  components/     NumInput/Stepper, Calendar, PageTitle, RoutineCard
 ```

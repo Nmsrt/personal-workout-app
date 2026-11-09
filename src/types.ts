@@ -20,18 +20,12 @@ export interface Exercise {
   photo?: string
 }
 
-export interface Stretch {
-  id: string
-  name: string
-  duration: number
-}
-
 export interface Routine {
   id: string
   name: string
   exercises: Exercise[]
-  warmup: Stretch[]
-  cooldown: Stretch[]
+  /** weekdays this routine is planned for, 0 = Monday … 6 = Sunday; missing/empty = not scheduled */
+  days?: number[]
 }
 
 export interface Settings {
@@ -42,8 +36,6 @@ export interface Settings {
   units: 'kg' | 'lb'
   weeklyGoal: number
   theme: 'auto' | 'light' | 'dark'
-  useWarmup: boolean
-  useCooldown: boolean
   reminderOn: boolean
   reminderTime: string
   showGuides: boolean
@@ -88,6 +80,8 @@ export interface Session {
   logs: Record<string, SetLog>
   /** pending = manual mode, waiting for the user to start the break */
   rest: { endAt: number; total: number; pending?: boolean } | null
+  /** step layout version `idx` refers to; missing = legacy (may include warm-up steps) */
+  layout?: number
 }
 
 export interface AppData {
@@ -102,8 +96,8 @@ export interface AppData {
   lastBackup?: number
   /** backup reminder hidden until this ms timestamp */
   backupSnoozeUntil?: number
+  /** day key (YYYY-MM-DD) when Home last auto-picked today's scheduled routine */
+  autoPickDay?: string
 }
 
-export type Step =
-  | { kind: 'warm' | 'cool'; stretch: Stretch }
-  | { kind: 'set'; exIdx: number; setIdx: number }
+export type Step = { exIdx: number; setIdx: number }

@@ -6,7 +6,7 @@ import { Stepper } from '../components/NumInput'
 import { useCountdown, useTick, useWakeLock } from '../hooks'
 import { buildSteps, buildWorkout, logKey, restFor, suggestions } from '../logic'
 import { useStore } from '../store'
-import type { Exercise, Routine, Session, SetLog, Settings, Step, Stretch, Workout } from '../types'
+import type { Exercise, Routine, Session, SetLog, Settings, Step, Workout } from '../types'
 import { alertUser, fmtDuration, fmtTime, fmtW, fromDisp, scheduleCountdown, toDisp, unlockAudio, vibrateCue } from '../util'
 
 interface Nav {
@@ -44,12 +44,12 @@ export function WorkoutScreen({ onExit }: { onExit: () => void }) {
     <div className="screen center-screen">
       <p className="muted">{msg}</p>
       <button className="btn primary" onClick={() => { setSession(null); onExit() }}>
-        Back to Today
+        Back to Home
       </button>
     </div>
   )
   if (!session || !routine) return bail('No workout in progress.')
-  const steps = buildSteps(routine, s)
+  const steps = buildSteps(routine)
   if (steps.length === 0) return bail('This routine has no exercises. Add some in Routines.')
 
   const idx = Math.min(Math.max(0, session.idx), steps.length - 1)
@@ -73,20 +73,21 @@ export function WorkoutScreen({ onExit }: { onExit: () => void }) {
 
   const restAfter = (i: number): number | null => {
     const cur = steps[i]
-    const nxt = steps[i + 1]
-    if (cur.kind !== 'set' || !nxt || nxt.kind !== 'set') return null
+    if (!steps[i + 1]) return null
     return restFor(routine.exercises[cur.exIdx], s)
   }
 
   const logSet = (log: SetLog) => {
-    if (step.kind !== 'set') return
     const ex = routine.exercises[step.exIdx]
     const sess = { ...session, logs: { ...session.logs, [logKey(ex.id, step.setIdx)]: log } }
     goTo(idx + 1, sess, restAfter(idx))
   }
 
-  const exStart = (exIdx: number) => steps.findIndex((st) => st.kind === 'set' && st.exIdx === exIdx)
-  const curEx = step.kind === 'set' ? step.exIdx : -1
+  const exStart = (exIdx: number) => steps.findIndex((st) => st.exIdx === exIdx)
+  const curEx = step.exIdx
+  // Neighbouring exercises that have sets (one with 0 sets has no steps to land on).
+  const prevEx = steps[exStart(curEx) - 1]?.exIdx
+  const nextStart = steps.findIndex((st) => st.exIdx > curEx)
   const loggedCount = Object.keys(session.logs).length
   const nav: Nav = { onBack: () => goTo(idx - 1), onSkip: () => goTo(idx + 1), backDisabled: idx === 0 }
   const doneOf = (ex: Exercise) => Array.from({ length: ex.sets }, (_, k) => session.logs[logKey(ex.id, k)]).filter(Boolean).length
@@ -94,8 +95,8 @@ export function WorkoutScreen({ onExit }: { onExit: () => void }) {
   return (
     <div className="screen workout">
       <header className="wo-head">
-        <button className="text-btn" onClick={onExit} aria-label="Back to menu">
-          <Icon name="chevL" size={18} /> Menu
+        <button className="text-btn" onClick={onExit} aria-label="Back to Home (workout keeps running)">
+          <Icon name="chevL" size={18} /> Home
         </button>
         <div className="wo-title">
           <strong>{routine.name}</strong>
@@ -112,12 +113,6 @@ export function WorkoutScreen({ onExit }: { onExit: () => void }) {
             <i style={{ width: `${(doneOf(ex) / Math.max(1, ex.sets)) * 100}%` }} />
           </span>
         ))}
-      </div>
-      <div className="wo-step mono">
-        <span>
-          Step {idx + 1}/{steps.length}
-        </span>
-        <span>{Math.round((idx / steps.length) * 100)}%</span>
       </div>
 
       {session.rest ? (
@@ -141,34 +136,24 @@ export function WorkoutScreen({ onExit }: { onExit: () => void }) {
           }}
           onDone={() => setSession((cur) => (cur ? { ...cur, rest: null } : cur))}
         />
-      ) : step.kind === 'set' ? (
+      ) : (
         <SetView
           key={`${routine.exercises[step.exIdx].id}:${step.setIdx}`}
           ex={routine.exercises[step.exIdx]}
-          exIdx={step.exIdx}
-          exCount={routine.exercises.length}
           setIdx={step.setIdx}
           session={session}
           settings={s}
           nav={nav}
           onLog={logSet}
         />
-      ) : (
-        <StretchView key={`${step.kind}:${step.stretch.id}`} stretch={step.stretch} kind={step.kind} settings={s} nav={nav} onNext={() => goTo(idx + 1)} />
       )}
 
-      {curEx >= 0 && !session.rest && (
+      {!session.rest && (
         <div className="jump">
-          <button className="text-btn" disabled={curEx === 0} onClick={() => goTo(exStart(curEx - 1))}>
+          <button className="text-btn" disabled={prevEx === undefined} onClick={() => prevEx !== undefined && goTo(exStart(prevEx))}>
             <Icon name="chevL" size={16} /> Prev exercise
           </button>
-          <button
-            className="text-btn"
-            onClick={() => {
-              const after = steps.findIndex((st, i) => i > idx && (st.kind !== 'set' || st.exIdx !== curEx))
-              goTo(after === -1 ? steps.length : after)
-            }}
-          >
+          <button className="text-btn" disabled={nextStart < 0} onClick={() => goTo(nextStart)}>
             Next exercise <Icon name="chevR" size={16} />
           </button>
         </div>
@@ -176,7 +161,9 @@ export function WorkoutScreen({ onExit }: { onExit: () => void }) {
 
       <details className="up-next">
         <summary>
-          <span className="label">All exercises</span>
+          <span className="label">
+            Exercise {curEx + 1} of {routine.exercises.length}
+          </span>
           <Icon name="chevR" size={16} />
         </summary>
         <ol className="wo-list">
@@ -270,13 +257,11 @@ function RestView({ rest, next, routine, settings, nav, onAdjust, onStart, onDon
     return () => clearTimeout(t)
   }, [ending, doneRef])
 
-  const nextEx = next.kind === 'set' ? routine.exercises[next.exIdx] : null
-  const nextName = nextEx ? nextEx.name : next.kind !== 'set' ? next.stretch.name : ''
+  const nextEx = routine.exercises[next.exIdx]
   return (
     <section className="wo-main">
-      <div className="eyebrow live">{pending ? 'Set done' : 'Break'}</div>
       <Ring pct={rest.total > 0 ? remaining / rest.total : 0} label={fmtTime(remaining / 1000)} caption={pending ? 'Break ready' : 'Recover'} urgent={!pending && remaining <= 3000} />
-      {ending && <TimeUp title="Break over" sub={nextName ? `Next: ${nextName}` : undefined} onClose={onDone} />}
+      {ending && <TimeUp title="Break over" sub={`Next: ${nextEx.name}`} onClose={onDone} />}
       <div className="ring-sub">
         {pending && (
           <button className="btn soft" aria-label="Shorten break by 15 seconds" onClick={() => onAdjust(-15000)}>
@@ -293,15 +278,13 @@ function RestView({ rest, next, routine, settings, nav, onAdjust, onStart, onDon
         )}
       </div>
       <div className="next-card">
-        {nextEx && settings.showGuides ? <GuideThumb ex={nextEx} animate /> : <Icon name="chevR" size={18} />}
+        {settings.showGuides ? <GuideThumb ex={nextEx} animate /> : <Icon name="chevR" size={18} />}
         <div className="grow">
           <span className="label">Up next</span>
-          <strong>{nextName}</strong>
-          {nextEx && next.kind === 'set' && (
-            <span className="small muted tnum-soft">
-              Set {next.setIdx + 1} of {nextEx.sets} · {targetText(nextEx, settings)}
-            </span>
-          )}
+          <strong>{nextEx.name}</strong>
+          <span className="small muted tnum-soft">
+            Set {next.setIdx + 1} of {nextEx.sets} · {targetText(nextEx, settings)}
+          </span>
         </div>
       </div>
       <Dock nav={nav}>
@@ -319,17 +302,20 @@ function RestView({ rest, next, routine, settings, nav, onAdjust, onStart, onDon
   )
 }
 
-function SetView({ ex, exIdx, exCount, setIdx, session, settings, nav, onLog }: { ex: Exercise; exIdx: number; exCount: number; setIdx: number; session: Session; settings: Settings; nav: Nav; onLog: (l: SetLog) => void }) {
+function SetView({ ex, setIdx, session, settings, nav, onLog }: { ex: Exercise; setIdx: number; session: Session; settings: Settings; nav: Nav; onLog: (l: SetLog) => void }) {
   const existing = session.logs[logKey(ex.id, setIdx)]
   const prev = session.logs[logKey(ex.id, setIdx - 1)]
   const [reps, setReps] = useState(existing?.reps ?? prev?.reps ?? ex.repMax)
   const [weight, setWeight] = useState(existing?.weight ?? prev?.weight ?? ex.weight)
   const u = settings.units
+  // Bodyweight moves skip the weight box; it shows if the plan or an earlier set used weight.
+  // Fixed at mount so stepping down to 0 doesn't unmount the stepper mid-set.
+  const [weighted, setWeighted] = useState(ex.weight > 0 || weight > 0)
 
   return (
     <section className="wo-main">
       <div className="eyebrow">
-        Exercise {exIdx + 1}/{exCount} · Set {setIdx + 1} of {ex.sets}
+        Set {setIdx + 1} of {ex.sets}
       </div>
       <h2 className="ex-name">{ex.name}</h2>
       <div className="target">
@@ -341,10 +327,15 @@ function SetView({ ex, exIdx, exCount, setIdx, session, settings, nav, onLog }: 
         <TimedView ex={ex} settings={settings} nav={nav} onComplete={(sec) => onLog({ reps: 0, weight, duration: sec })} />
       ) : (
         <>
-          <div className="steppers">
+          <div className={`steppers${weighted ? '' : ' single'}`}>
             <Stepper label="Reps" value={reps} onChange={setReps} />
-            <Stepper label="Weight" unit={u} decimal step={u === 'kg' ? 0.5 : 1} value={toDisp(weight, u)} onChange={(v) => setWeight(fromDisp(v, u))} />
+            {weighted && <Stepper label="Weight" unit={u} decimal step={u === 'kg' ? 0.5 : 1} value={toDisp(weight, u)} onChange={(v) => setWeight(fromDisp(v, u))} />}
           </div>
+          {!weighted && (
+            <button className="text-btn small" onClick={() => setWeighted(true)}>
+              + Add weight
+            </button>
+          )}
           <Dock nav={nav}>
             <button className="btn primary xl main" onClick={() => { unlockAudio(); onLog({ reps, weight, duration: 0 }) }}>
               <Icon name="check" size={22} stroke={2.6} /> Done
@@ -445,54 +436,6 @@ function TimedView({ ex, settings, nav, onComplete }: { ex: Exercise; settings: 
   )
 }
 
-function StretchView({ stretch, kind, settings, nav, onNext }: { stretch: Stretch; kind: 'warm' | 'cool'; settings: Settings; nav: Nav; onNext: () => void }) {
-  const total = stretch.duration * 1000
-  const [ending, setEnding] = useState(false)
-  const cd = useCountdown(total, () => {
-    vibrateCue(settings, 'end')
-    setEnding(true)
-  })
-  useEffect(() => {
-    if (cd.endAt == null) return
-    return scheduleCountdown(settings, cd.endAt, 'end')
-  }, [cd.endAt, settings])
-  const nextRef = useLatest(onNext)
-  useEffect(() => {
-    if (!ending) return
-    const t = setTimeout(() => nextRef.current(), 1600)
-    return () => clearTimeout(t)
-  }, [ending, nextRef])
-  const fresh = cd.remaining === total
-  return (
-    <section className="wo-main">
-      <div className="eyebrow">{kind === 'warm' ? 'Warm-up' : 'Cool-down'}</div>
-      <h2 className="ex-name">{stretch.name}</h2>
-      <Ring pct={cd.remaining / total} label={fmtTime(cd.remaining / 1000)} caption={cd.running ? 'Stretch' : fresh ? `${stretch.duration}s` : 'Paused'} urgent={cd.running && cd.remaining <= 3000} />
-      {ending && <TimeUp title="Nice stretch" sub={stretch.name} onClose={onNext} />}
-      <div className="ring-sub">
-        {cd.running ? (
-          <button className="btn soft" onClick={cd.pause}>
-            <Icon name="pause" size={16} /> Pause
-          </button>
-        ) : (
-          <button className="btn soft" onClick={() => { unlockAudio(); if (fresh) cd.start(total); else cd.resume() }}>
-            <Icon name="play" size={16} /> {fresh ? 'Start' : 'Resume'}
-          </button>
-        )}
-        {!fresh && (
-          <button className="btn soft" onClick={() => cd.reset(total)}>
-            <Icon name="reset" size={16} /> Reset
-          </button>
-        )}
-      </div>
-      <Dock nav={nav}>
-        <button className="btn primary xl main" onClick={onNext}>
-          Next
-        </button>
-      </Dock>
-    </section>
-  )
-}
 
 function Ring({ pct, label, caption, accent, urgent, done }: { pct: number; label: string; caption?: string; accent?: 'warn'; urgent?: boolean; done?: boolean }) {
   const R = 92

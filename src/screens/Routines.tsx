@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { ExerciseFigure } from '../components/ExerciseFigure'
 import { Icon } from '../components/Icon'
+import { DayPicker } from '../components/DayPicker'
+import { PageTitle } from '../components/PageTitle'
 import { NumInput } from '../components/NumInput'
 import { RoutineCard } from '../components/RoutineCard'
-import { estimateMin } from '../logic'
+import { formatDays } from '../logic'
 import { PRESETS } from '../seed'
 import { useStore } from '../store'
-import type { Exercise, Routine, Stretch } from '../types'
+import type { Exercise, Routine } from '../types'
 import { ANIM_OPTIONS, animFor, detectAnim, ANIMS } from '../figures/anims'
 import { compressImage, fromDisp, toDisp, uid } from '../util'
 
@@ -48,7 +50,7 @@ export function Routines() {
 
   const addRoutine = () => {
     const ex = newExercise()
-    const nr: Routine = { id: uid(), name: 'New routine', exercises: [ex], warmup: [], cooldown: [] }
+    const nr: Routine = { id: uid(), name: 'New routine', exercises: [ex] }
     update((d) => ({ ...d, routines: [...d.routines, nr] }))
     setFreshExercise(ex.id)
     setOpenRoutine(nr.id)
@@ -57,17 +59,7 @@ export function Routines() {
 
   return (
     <div className="screen">
-      <header className="topbar">
-        <div>
-          <span className="label">
-            {data.routines.length} routine{data.routines.length === 1 ? '' : 's'}
-          </span>
-          <h1 className="display">Routines</h1>
-        </div>
-        <button className="btn primary icon-only" aria-label="New routine" onClick={addRoutine}>
-          <Icon name="plus" size={20} stroke={2.2} />
-        </button>
-      </header>
+      <PageTitle title="Routines" sub={`${data.routines.length} routine${data.routines.length === 1 ? '' : 's'}`} />
 
       <div className="routine-list">
         {sorted.map((r) => (
@@ -116,23 +108,23 @@ function RoutineDetail({ r, initialOpen, onBack, onOpen }: { r: Routine; initial
 
   return (
     <div className="screen">
-      <button className="text-btn back-link" onClick={onBack}>
-        <Icon name="chevL" size={18} /> All routines
-      </button>
-      <header className="topbar">
-        <div style={{ minWidth: 0 }}>
-          <span className="label">
-            {r.exercises.length} exercise{r.exercises.length === 1 ? '' : 's'} · {sets} set{sets === 1 ? '' : 's'} · ~{estimateMin(r, data.settings)} min
-          </span>
-          <h1 className="display detail-title">{r.name || 'Untitled'}</h1>
-        </div>
-      </header>
+      <PageTitle
+        title={r.name || 'Untitled'}
+        sub={`${r.exercises.length} exercise${r.exercises.length === 1 ? '' : 's'} · ${sets} set${sets === 1 ? '' : 's'}`}
+        onBack={onBack}
+        backLabel="All routines"
+      />
 
       <section className="card form-stack">
         <label className="field">
           <span>Routine name</span>
           <input value={r.name} onChange={(e) => updateRoutine(r.id, (rt) => ({ ...rt, name: e.target.value }))} />
         </label>
+        <div className="field">
+          <span>Planned days</span>
+          <DayPicker value={r.days ?? []} onChange={(days) => updateRoutine(r.id, (rt) => ({ ...rt, days }))} />
+          <small className="muted small">{r.days?.length ? `${formatDays(r.days)}. Shows first on Home on those days.` : 'Pick days to plan this routine. Optional.'}</small>
+        </div>
         <div className="btn-row wrap">
           {isActive ? (
             <span className="tag" style={{ margin: 0, alignSelf: 'center' }}>
@@ -177,12 +169,6 @@ function RoutineDetail({ r, initialOpen, onBack, onOpen }: { r: Routine; initial
           <Icon name="plus" size={18} /> Add exercise
         </button>
       </div>
-
-      <StretchEditor title="Warm-up" items={r.warmup} onChange={(warmup) => updateRoutine(r.id, (rt) => ({ ...rt, warmup }))} />
-      <StretchEditor title="Cool-down" items={r.cooldown} onChange={(cooldown) => updateRoutine(r.id, (rt) => ({ ...rt, cooldown }))} />
-      <p className="muted small" style={{ margin: '8px 2px' }}>
-        Turn warm-up and cool-down on in Settings.
-      </p>
 
       {PRESETS[r.id] && (
         <div className="danger-zone">
@@ -287,34 +273,6 @@ function ExerciseEditor({ ex, index, count, open, onToggle, units, defaultRest, 
   )
 }
 
-function StretchEditor({ title, items, onChange }: { title: string; items: Stretch[]; onChange: (s: Stretch[]) => void }) {
-  return (
-    <div>
-      <div className="section-head">
-        <span className="label">{title}</span>
-        <span className="muted small mono">{items.reduce((a, x) => a + x.duration, 0)}s</span>
-      </div>
-      <div className="card" style={{ paddingTop: 6, paddingBottom: 12 }}>
-        {items.length === 0 && <p className="muted small">No stretches yet.</p>}
-        {items.map((st, i) => (
-          <div key={st.id} className="stretch-row">
-            <input className="input" aria-label={`${title} name`} value={st.name} onChange={(e) => onChange(items.map((x) => (x.id === st.id ? { ...x, name: e.target.value } : x)))} />
-            <NumInput className="input num" value={st.duration} min={1} max={600} ariaLabel={`${st.name} seconds`} onChange={(v) => onChange(items.map((x) => (x.id === st.id ? { ...x, duration: v ?? 1 } : x)))} />
-            <button className="btn" aria-label={`Move ${st.name} up`} disabled={i === 0} onClick={() => onChange(move(items, i, -1))}>
-              <Icon name="up" size={16} />
-            </button>
-            <button className="btn" aria-label={`Remove ${st.name}`} onClick={() => onChange(items.filter((x) => x.id !== st.id))}>
-              <Icon name="x" size={16} />
-            </button>
-          </div>
-        ))}
-        <button className="btn soft sm" style={{ marginTop: 12 }} onClick={() => onChange([...items, { id: uid(), name: 'Stretch', duration: 30 }])}>
-          <Icon name="plus" size={16} /> Add stretch
-        </button>
-      </div>
-    </div>
-  )
-}
 
 const STORAGE_BUDGET = 4_500_000
 

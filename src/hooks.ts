@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { dayKey } from './util'
 
 /** Re-render periodically while `active`, and whenever the tab becomes visible again. */
 export function useTick(active: boolean, ms = 250) {
@@ -68,4 +69,21 @@ export function useWakeLock(active: boolean) {
       void lock?.release().catch(() => {})
     }
   }, [active])
+}
+
+/** Today's local date key ("YYYY-MM-DD"). Re-renders when the date changes, e.g. a PWA left open past midnight. */
+export function useToday(): string {
+  const [today, setToday] = useState(() => dayKey(Date.now()))
+  useEffect(() => {
+    const check = () => setToday(dayKey(Date.now())) // same string = no re-render
+    const t = setInterval(check, 60_000)
+    document.addEventListener('visibilitychange', check)
+    window.addEventListener('focus', check)
+    return () => {
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', check)
+      window.removeEventListener('focus', check)
+    }
+  }, [])
+  return today
 }
