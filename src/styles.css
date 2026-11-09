@@ -344,18 +344,26 @@ h1.display { font-size: 2.75rem; }
 .home .hero { padding: 20px 20px 20px; }
 .hero-date { margin: 0 0 14px; font-size: 0.95rem; color: var(--hero-muted); }
 .hero-date b { color: var(--hero-ink); font-weight: 600; }
-.today-tag { background: var(--signal); color: var(--on-signal); }
 .day-picker { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .day-picker button { aspect-ratio: 1; max-height: 44px; min-height: 40px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2); font: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; padding: 0; transition: background-color 0.15s var(--ease), color 0.15s var(--ease); }
 .day-picker button.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .home .hero-title { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; font-size: 1.85rem; line-height: 1; margin: 8px 0 8px; overflow-wrap: anywhere; }
-.rp-row { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); font: inherit; color: inherit; text-align: left; cursor: pointer; transition: background-color 0.15s var(--ease); }
-.rp-row:active { background: var(--inset); }
-.rp-row.on { background: var(--signal-soft); }
-.rp-mark { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line-strong); flex-shrink: 0; }
-.rp-row.on .rp-mark { background: var(--signal); border-color: var(--signal); color: var(--on-signal); }
 .home .hero-meta { gap: 8px; margin-bottom: 20px; }
 .home .hero .btn.signal { font-weight: 700; }
+.hero-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.hero-chips button { font: inherit; font-size: 0.82rem; font-weight: 600; padding: 6px 12px; min-height: 34px; border-radius: 999px; border: 1px solid var(--hero-line); background: transparent; color: var(--hero-muted); cursor: pointer; }
+.hero-chips button.on { background: var(--hero-ink); border-color: var(--hero-ink); color: var(--hero-bg); }
+.week-plan { list-style: none; margin: 0; padding: 0; }
+.wp-row { display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.wp-row:last-child { border-bottom: 0; }
+.wp-day { width: 40px; flex-shrink: 0; font-weight: 700; font-size: 0.9rem; }
+.wp-name { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wp-row.rest .wp-name { font-weight: 400; color: var(--muted); }
+.wp-status { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.wp-row.done .wp-status { color: var(--on-signal); background: var(--signal); padding: 3px 8px; border-radius: 6px; }
+.wp-row.today .wp-status { color: var(--on-primary); background: var(--primary); padding: 3px 8px; border-radius: 6px; }
+.wp-row.is-today { background: var(--signal-soft); }
+.wp-row.missed .wp-name { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line-strong); }
 .hero-note { margin: 0 0 4px; color: var(--hero-muted); font-size: 0.95rem; line-height: 1.45; }
 .hero-note b { color: var(--hero-ink); font-weight: 600; }
 .home .section-head { margin-top: 22px; }
@@ -582,7 +590,12 @@ h1.display { font-size: 2.75rem; }
 .rc-active { background: var(--signal); color: var(--on-signal); margin: 2px 0 0; flex-shrink: 0; }
 .rc-meta { display: flex; gap: 14px; margin-top: 8px; font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rc-meta b { color: var(--ink); font-weight: 700; }
-.rc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); }
+.rc-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); }
+.rc-days { display: flex; gap: 3px; }
+.rc-days span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 0.66rem; font-weight: 700; background: var(--signal); color: var(--on-signal); }
+.rc-nodays { font-size: 0.8rem; font-style: italic; color: var(--muted); }
+.rc-last { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; font-size: 0.8rem; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.rc-last.never { font-weight: 500; color: var(--muted); }
 
 /* ───────── Exercise figures ───────── */
 :root { --fig: #111210; --fig-far: #a3a49c; }

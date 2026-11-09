@@ -161,7 +161,7 @@ describe('progress', () => {
 describe('planned days', () => {
   const todayIdx = (new Date().getDay() + 6) % 7
 
-  it('on a new day, Home picks the routine planned for today and lists it first', () => {
+  it('on a new day, Home picks the routine planned for today and shows it in the week plan', () => {
     const d = defaultData()
     d.activeRoutineId = 'seed-upper-body'
     d.autoPickDay = '2000-01-01'
@@ -169,9 +169,26 @@ describe('planned days', () => {
     mount(d)
     expect(screen.getByText('Planned for today')).toBeTruthy()
     expect(savedData().activeRoutineId).toBe('preset-full-body')
-    const rows = screen.getAllByRole('radio')
-    expect(rows[0].textContent).toContain('Full Body Express')
-    expect(rows[0].textContent).toContain('Today')
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Full Body Express')
+    const plan = within(screen.getByRole('list', { name: "This week's plan" })).getAllByRole('listitem')
+    expect(plan).toHaveLength(7)
+    expect(plan[todayIdx].textContent).toContain('Full Body Express')
+    expect(plan[todayIdx].textContent).toContain('Today')
+    expect(screen.queryByRole('radio')).toBeNull()
+  })
+
+  it('with nothing planned on any day, the week plan explains how to plan', () => {
+    mount()
+    expect(screen.getByText('No days planned')).toBeTruthy()
+  })
+
+  it('a finished workout shows as done in the week plan', () => {
+    const d = defaultData()
+    d.routines = d.routines.map((r) => (r.id === 'seed-upper-body' ? { ...r, days: [todayIdx] } : r))
+    d.history = [{ ...yesterdayWorkout(), id: 'w-today', start: Date.now() - 60000, end: Date.now() }]
+    mount(d)
+    const plan = within(screen.getByRole('list', { name: "This week's plan" })).getAllByRole('listitem')
+    expect(plan[todayIdx].textContent).toContain('Done')
   })
 
   it('does not auto-pick while a workout for another routine is running; the hero shows the running one', () => {
@@ -206,10 +223,10 @@ describe('planned days', () => {
     expect(screen.queryByText('Ready to progress')).toBeNull()
   })
 
-  it('a manual pick after the auto-pick sticks for the day', () => {
+  it('with two routines planned today, a pick from the hero chips sticks for the day', () => {
     const d = defaultData()
     d.autoPickDay = '2000-01-01'
-    d.routines = d.routines.map((r) => (r.id === 'preset-full-body' ? { ...r, days: [todayIdx] } : r))
+    d.routines = d.routines.map((r) => (r.id !== 'seed-upper-body' ? { ...r, days: [todayIdx] } : r))
     const { unmount } = mount(d)
     fireEvent.click(screen.getByRole('radio', { name: /Lower Body & Core/ }))
     unmount()

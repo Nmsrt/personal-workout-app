@@ -1,11 +1,11 @@
-import { estimateMin, formatDays } from '../logic'
+import { DAY_LETTERS, DAY_NAMES, estimateMin, formatDays } from '../logic'
 import type { Routine, Settings, Workout } from '../types'
 import { Icon } from './Icon'
 
-function lastDoneLabel(history: Workout[], routineId: string): string {
+function lastDone(history: Workout[], routineId: string): Workout | undefined {
   let last: Workout | undefined
   for (const w of history) if (w.routineId === routineId && (!last || w.start > last.start)) last = w
-  return last ? `Last done ${new Date(last.start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : 'Not done yet'
+  return last
 }
 
 const plural = (n: number, w: string) => `${w}${n === 1 ? '' : 's'}`
@@ -20,6 +20,7 @@ interface Props {
 
 export function RoutineCard({ r, active, settings, history, onClick }: Props) {
   const when = formatDays(r.days)
+  const last = lastDone(history, r.id)
   return (
     <div className={`routine-card${active ? ' active' : ''}`}>
       <button className="rc-btn" onClick={onClick} aria-label={`Open ${r.name}`}>
@@ -36,9 +37,20 @@ export function RoutineCard({ r, active, settings, history, onClick }: Props) {
           </span>
         </div>
         <div className="rc-foot">
-          <span className="muted small">
-            {when ? `${when} · ` : ''}
-            {lastDoneLabel(history, r.id)}
+          {r.days?.length ? (
+            <span className="rc-days" role="img" aria-label={`Planned: ${when}`}>
+              {r.days.map((i) => (
+                <span key={i} title={DAY_NAMES[i]}>
+                  {DAY_LETTERS[i]}
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="rc-nodays">No days planned</span>
+          )}
+          <span className={`rc-last${last ? '' : ' never'}`}>
+            <Icon name="clock" size={14} />
+            {last ? new Date(last.start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Not done yet'}
           </span>
           <span className="rc-chev">
             <Icon name="chevR" size={18} />

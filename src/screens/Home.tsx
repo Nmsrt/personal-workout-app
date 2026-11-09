@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { backupDue, exportBackup, snoozeUntil } from '../backup'
 import { Icon } from '../components/Icon'
 import { useToday } from '../hooks'
-import { DAY_LETTERS, estimateMin, formatDays, scheduledOn, weekStart, weekStreak, workoutsThisWeek } from '../logic'
+import { DAY_LETTERS, DAY_NAMES, estimateMin, scheduledOn, weekStart, weekStreak, workoutsThisWeek } from '../logic'
 import { activeRoutine, SESSION_LAYOUT, useStore } from '../store'
 import { dayKey, unlockAudio } from '../util'
 
@@ -25,11 +25,9 @@ export function Home({ onStart, onProfile }: { onStart: () => void; onProfile: (
   const { data, update, session, setSession } = useStore()
   // While a workout runs, the hero shows that routine, not the one picked for later.
   const picked = activeRoutine(data)
-  const r = (session && data.routines.find((x) => x.id === session.routineId)) || picked
   const s = data.settings
   const week = workoutsThisWeek(data.history)
   const streak = weekStreak(data.history, s.weeklyGoal)
-  const totalSets = r.exercises.reduce((a, e) => a + e.sets, 0)
 
   const today = useToday()
   const ws = weekStart(Date.now())
@@ -46,8 +44,22 @@ export function Home({ onStart, onProfile }: { onStart: () => void; onProfile: (
   const plannedIds = new Set(plannedToday.map((x) => x.id))
   // Nothing scheduled today and no workout running: the hero says so instead of pushing a routine.
   const restDay = !session && plannedToday.length === 0
-  // Routines planned for today first, then the rest in their usual order.
-  const listed = [...plannedToday, ...data.routines.filter((x) => !plannedIds.has(x.id))]
+  // Hero routine: the running one, else the picked one if it's planned today, else the first planned today.
+  const r = (session && data.routines.find((x) => x.id === session.routineId)) || (plannedIds.has(picked.id) ? picked : plannedToday[0] ?? picked)
+  const totalSets = r.exercises.reduce((a, e) => a + e.sets, 0)
+
+  // This week's plan: what's planned each day, and what was actually done.
+  const anyPlanned = data.routines.some((x) => x.days?.length)
+  const plan = DAY_NAMES.map((name, i) => {
+    const dt = new Date(ws)
+    dt.setDate(dt.getDate() + i)
+    const k = dayKey(dt.getTime())
+    const did = data.history.filter((w) => dayKey(w.start) === k)
+    const planned = data.routines.filter((x) => x.days?.includes(i))
+    const status = did.length ? 'done' : k === today ? 'today' : k < today && planned.length ? 'missed' : planned.length ? 'planned' : 'rest'
+    const names = did.length ? [...new Set(did.map((w) => w.routineName))] : planned.map((x) => x.name || 'Untitled')
+    return { name, short: name.slice(0, 3), status, names, isToday: k === today }
+  })
 
   // Once per day, make today's planned routine the one up next. A manual pick after that sticks.
   // Waits while a workout is running so it doesn't swap the routine out from under it.
@@ -110,6 +122,15 @@ export function Home({ onStart, onProfile }: { onStart: () => void; onProfile: (
           <>
             <span className="label">{session ? 'In progress' : trainedToday ? 'Trained today · Up next' : plannedIds.has(r.id) ? 'Planned for today' : 'Up next'}</span>
             <h2 className="hero-title">{r.name || 'Untitled'}</h2>
+            {!session && plannedToday.length > 1 && (
+              <div className="hero-chips" role="radiogroup" aria-label="Today's routines">
+                {plannedToday.map((x) => (
+                  <button key={x.id} role="radio" aria-checked={x.id === r.id} className={x.id === r.id ? 'on' : ''} onClick={() => update((d) => ({ ...d, activeRoutineId: x.id }))}>
+                    {x.name || 'Untitled'}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="hero-meta">
               <span>
                 <b>{r.exercises.length}</b> exercise{r.exercises.length === 1 ? '' : 's'}
@@ -159,38 +180,35 @@ export function Home({ onStart, onProfile }: { onStart: () => void; onProfile: (
 
       <section>
         <div className="section-head">
-          <span className="label">{plannedToday.length ? 'Routines · planned first' : 'Routines'}</span>
-          <span className="muted small">Tap to choose</span>
+          <span className="label">This week's plan</span>
         </div>
-        <div className="group routine-pick" role="radiogroup" aria-label="Choose your next routine">
-          {listed.map((x) => {
-            const on = x.id === picked.id
-            const when = formatDays(x.days)
-            return (
-              <button
-                key={x.id}
-                role="radio"
-                aria-checked={on}
-                className={`row-item rp-row${on ? ' on' : ''}`}
-                onClick={() => update((d) => ({ ...d, activeRoutineId: x.id }))}
-              >
-                <div className="grow">
-                  <div className="title">
-                    {x.name || 'Untitled'}
-                    {plannedIds.has(x.id) && <span className="tag today-tag">Today</span>}
-                  </div>
-                  <div className="sub">
-                    {x.exercises.length} exercise{x.exercises.length === 1 ? '' : 's'}
-                    {when && ` · ${when}`}
-                  </div>
-                </div>
-                <span className="rp-mark" aria-hidden>
-                  {on && <Icon name="check" size={16} />}
+        {anyPlanned ? (
+          <ol className="group week-plan" aria-label="This week's plan">
+            {plan.map((p) => (
+              <li key={p.name} className={`wp-row ${p.status}${p.isToday ? ' is-today' : ''}`}>
+                <span className="wp-day">{p.short}</span>
+                <span className="wp-name">{p.names.length ? p.names.join(' + ') : 'Rest'}</span>
+                <span className="wp-status">
+                  {p.status === 'done' ? (
+                    <>
+                      <Icon name="check" size={14} stroke={2.6} /> Done
+                    </>
+                  ) : p.status === 'today' ? (
+                    'Today'
+                  ) : p.status === 'missed' ? (
+                    'Missed'
+                  ) : null}
                 </span>
-              </button>
-            )
-          })}
-        </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <div className="group empty">
+            <Icon name="calendar" size={32} />
+            <strong>No days planned</strong>
+            Open a routine in Routines and pick its days to build your week.
+          </div>
+        )}
       </section>
 
       {due && (
