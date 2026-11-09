@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { backupDue, exportBackup, snoozeUntil } from '../backup'
 import { Icon } from '../components/Icon'
 import { useToday } from '../hooks'
-import { DAY_LETTERS, estimateMin, formatDays, scheduledOn, suggestions, weekStart, weekStreak, workoutsThisWeek } from '../logic'
+import { DAY_LETTERS, estimateMin, formatDays, scheduledOn, weekStart, weekStreak, workoutsThisWeek } from '../logic'
 import { activeRoutine, SESSION_LAYOUT, useStore } from '../store'
 import { dayKey, unlockAudio } from '../util'
 
@@ -22,18 +22,14 @@ export function ThemeToggle() {
 }
 
 export function Home({ onStart, onProfile }: { onStart: () => void; onProfile: () => void }) {
-  const { data, update, updateRoutine, session, setSession } = useStore()
+  const { data, update, session, setSession } = useStore()
   // While a workout runs, the hero shows that routine, not the one picked for later.
   const picked = activeRoutine(data)
   const r = (session && data.routines.find((x) => x.id === session.routineId)) || picked
   const s = data.settings
   const week = workoutsThisWeek(data.history)
   const streak = weekStreak(data.history, s.weeklyGoal)
-  const last = [...data.history].reverse().find((w) => w.routineId === r.id)
-  const sugg = suggestions(r, last, s.units)
   const totalSets = r.exercises.reduce((a, e) => a + e.sets, 0)
-  const [allSugg, setAllSugg] = useState(false)
-  const shownSugg = allSugg ? sugg : sugg.slice(0, 2)
 
   const today = useToday()
   const ws = weekStart(Date.now())
@@ -48,6 +44,8 @@ export function Home({ onStart, onProfile }: { onStart: () => void; onProfile: (
   })
   const plannedToday = scheduledOn(data.routines, Date.now())
   const plannedIds = new Set(plannedToday.map((x) => x.id))
+  // Nothing scheduled today and no workout running: the hero says so instead of pushing a routine.
+  const restDay = !session && plannedToday.length === 0
   // Routines planned for today first, then the rest in their usual order.
   const listed = [...plannedToday, ...data.routines.filter((x) => !plannedIds.has(x.id))]
 
@@ -102,25 +100,35 @@ export function Home({ onStart, onProfile }: { onStart: () => void; onProfile: (
             <b>{new Date().toLocaleDateString(undefined, { weekday: 'long' })}</b>, {new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
           </time>
         </p>
-        <span className="label">{session ? 'In progress' : trainedToday ? 'Trained today · Up next' : plannedIds.has(r.id) ? 'Planned for today' : 'Up next'}</span>
-        <h2 className="hero-title">{r.name || 'Untitled'}</h2>
-        <div className="hero-meta">
-          <span>
-            <b>{r.exercises.length}</b> exercise{r.exercises.length === 1 ? '' : 's'}
-          </span>
-          <span aria-hidden>·</span>
-          <span>
-            <b>{totalSets}</b> sets
-          </span>
-          <span aria-hidden>·</span>
-          <span>
-            ~<b>{estimateMin(r, s)}</b> min
-          </span>
-        </div>
-        {!session && (
-          <button className="btn signal lg block" disabled={r.exercises.length === 0} onClick={() => start()}>
-            <Icon name="play" size={18} /> Start workout
-          </button>
+        {restDay ? (
+          <>
+            <span className="label">{trainedToday ? 'Trained today' : 'Rest day'}</span>
+            <h2 className="hero-title">No session today</h2>
+            <p className="hero-note">{trainedToday ? 'Nothing else planned. Good work, now recover.' : 'Nothing planned for today. Rest up and recover.'}</p>
+          </>
+        ) : (
+          <>
+            <span className="label">{session ? 'In progress' : trainedToday ? 'Trained today · Up next' : plannedIds.has(r.id) ? 'Planned for today' : 'Up next'}</span>
+            <h2 className="hero-title">{r.name || 'Untitled'}</h2>
+            <div className="hero-meta">
+              <span>
+                <b>{r.exercises.length}</b> exercise{r.exercises.length === 1 ? '' : 's'}
+              </span>
+              <span aria-hidden>·</span>
+              <span>
+                <b>{totalSets}</b> sets
+              </span>
+              <span aria-hidden>·</span>
+              <span>
+                ~<b>{estimateMin(r, s)}</b> min
+              </span>
+            </div>
+            {!session && (
+              <button className="btn signal lg block" disabled={r.exercises.length === 0} onClick={() => start()}>
+                <Icon name="play" size={18} /> Start workout
+              </button>
+            )}
+          </>
         )}
       </section>
 
@@ -148,32 +156,6 @@ export function Home({ onStart, onProfile }: { onStart: () => void; onProfile: (
           ))}
         </div>
       </section>
-
-      {sugg.length > 0 && (
-        <section>
-          <div className="section-head">
-            <span className="label">Ready to progress</span>
-          </div>
-          <div className="group">
-            {shownSugg.map((sg) => (
-              <div key={sg.exerciseId} className="row-item">
-                <div className="grow">
-                  <div className="title">{sg.name}</div>
-                  <div className="sub">{sg.text}</div>
-                </div>
-                <button className="btn soft sm" onClick={() => updateRoutine(r.id, (rt) => ({ ...rt, exercises: rt.exercises.map((e) => (e.id === sg.exerciseId ? sg.apply(e) : e)) }))}>
-                  Apply
-                </button>
-              </div>
-            ))}
-          </div>
-          {sugg.length > 2 && (
-            <button className="text-btn more-btn" onClick={() => setAllSugg(!allSugg)}>
-              {allSugg ? 'Show less' : `Show all ${sugg.length}`}
-            </button>
-          )}
-        </section>
-      )}
 
       <section>
         <div className="section-head">

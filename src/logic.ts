@@ -77,44 +77,6 @@ export function buildWorkout(r: Routine, session: Session, end: number, history:
   }
 }
 
-export interface Suggestion {
-  exerciseId: string
-  name: string
-  text: string
-  apply: (ex: Exercise) => Exercise
-}
-
-/** Suggest progression when every target set hit the top of the range (and the target hasn't changed since). */
-export function suggestions(r: Routine, last: Workout | undefined, units: Settings['units']): Suggestion[] {
-  if (!last) return []
-  const out: Suggestion[] = []
-  for (const log of last.exercises) {
-    const ex = r.exercises.find((e) => e.id === log.exerciseId)
-    if (!ex || log.sets.length < log.targetSets) continue
-    if (ex.type === 'timed') {
-      if (ex.duration !== log.targetDuration) continue
-      if (log.sets.every((s) => s.duration >= log.targetDuration)) {
-        out.push({ exerciseId: ex.id, name: ex.name, text: `Held ${log.targetDuration}s every set. Go to ${ex.duration + 5}s?`, apply: (e) => ({ ...e, duration: e.duration + 5 }) })
-      }
-      continue
-    }
-    if (ex.repMax !== log.targetRepMax || ex.weight !== log.targetWeight) continue
-    if (!log.sets.every((s) => s.reps >= log.targetRepMax)) continue
-    if (ex.weight > 0) {
-      const step = units === 'kg' ? 1 : 2.5 * 0.45359237
-      out.push({
-        exerciseId: ex.id,
-        name: ex.name,
-        text: `Hit ${log.targetRepMax} reps on all sets. Add weight (+${units === 'kg' ? '1 kg' : '2.5 lb'})?`,
-        apply: (e) => ({ ...e, weight: Math.round((e.weight + step) * 1000) / 1000 })
-      })
-    } else {
-      out.push({ exerciseId: ex.id, name: ex.name, text: `Hit ${log.targetRepMax} reps on all sets. Raise to ${ex.repMin + 2}-${ex.repMax + 2}?`, apply: (e) => ({ ...e, repMin: e.repMin + 2, repMax: e.repMax + 2 }) })
-    }
-  }
-  return out
-}
-
 /** Weekday labels, Monday first (index = weekday index). */
 export const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

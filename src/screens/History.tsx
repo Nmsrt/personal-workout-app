@@ -45,7 +45,7 @@ export function History() {
                 <div className="grow">
                   <strong>{w.routineName}</strong>
                   <div className="muted small" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} · {fmtDuration(w.end - w.start)}
+                    {d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
                 {w.prs.length > 0 && (
@@ -71,6 +71,11 @@ export function History() {
                     <span className="mono">{e.sets.map((x) => (e.type === 'timed' ? `${x.duration}s` : `${x.reps}${x.weight ? `×${toDisp(x.weight, u)}` : ''}`)).join(' · ')}</span>
                   </div>
                 ))}
+                <div className="hist-total">
+                  <Icon name="clock" size={18} />
+                  <span className="label">Duration</span>
+                  <span className="hist-total-v">{fmtDuration(w.end - w.start)}</span>
+                </div>
                 <button className="text-btn danger small" onClick={() => confirm('Delete this workout from history?') && update((dd) => ({ ...dd, history: dd.history.filter((x) => x.id !== w.id) }))}>
                   <Icon name="trash" size={16} /> Delete session
                 </button>

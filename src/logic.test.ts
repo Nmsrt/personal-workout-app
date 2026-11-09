@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bestWeekStreak, buildSteps, buildWorkout, computePRs, logKey, monthStats, restFor, suggestions, weekStart, weekStreak, weeklyCounts } from './logic'
+import { bestWeekStreak, buildSteps, buildWorkout, computePRs, logKey, monthStats, restFor, weekStart, weekStreak, weeklyCounts } from './logic'
 import { seedRoutine } from './seed'
 import type { Session, Workout } from './types'
 
@@ -15,18 +15,18 @@ function fullSession(reps: (exIdx: number) => number, dur = 30): Session {
 
 describe('buildSteps', () => {
   it('one step per set', () => {
-    expect(buildSteps(r)).toHaveLength(14)
+    expect(buildSteps(r)).toHaveLength(16)
   })
   it('reflects edits to the routine', () => {
     const edited = { ...r, exercises: r.exercises.map((e, i) => (i === 0 ? { ...e, sets: 4 } : e)) }
-    expect(buildSteps(edited)).toHaveLength(16)
+    expect(buildSteps(edited)).toHaveLength(18)
   })
 })
 
 describe('buildWorkout + PRs', () => {
   it('collects logged sets and flags PRs only against prior data', () => {
     const w1 = buildWorkout(r, fullSession(() => 10), 5000, [])
-    expect(w1.exercises).toHaveLength(7)
+    expect(w1.exercises).toHaveLength(8)
     expect(w1.prs).toEqual([])
     const w2 = buildWorkout(r, fullSession((i) => (i === 1 ? 11 : 10), 35), 9000, [w1])
     expect(w2.prs.sort()).toEqual(['Plank', 'Push-ups'])
@@ -39,26 +39,6 @@ describe('buildWorkout + PRs', () => {
   })
   it('computePRs ignores first-ever exercise', () => {
     expect(computePRs([], [{ exerciseId: 'x', name: 'X', type: 'reps', targetRepMax: 1, targetWeight: 0, targetDuration: 0, targetSets: 1, sets: [{ reps: 5, weight: 0, duration: 0 }] }])).toEqual([])
-  })
-})
-
-describe('suggestions', () => {
-  it('suggests when top of range hit on all sets, and disappears after applying', () => {
-    const w = buildWorkout(r, fullSession((i) => r.exercises[i].repMax), 5000, [])
-    const sg = suggestions(r, w, 'kg')
-    expect(sg.map((s) => s.name)).toContain('Goblet squats')
-    expect(sg.map((s) => s.name)).toContain('Push-ups')
-    expect(sg.map((s) => s.name)).toContain('Plank')
-    const squat = sg.find((s) => s.name === 'Goblet squats')!
-    const updated = { ...r, exercises: r.exercises.map((e) => (e.id === squat.exerciseId ? squat.apply(e) : e)) }
-    expect(updated.exercises[0].weight).toBe(5)
-    expect(suggestions(updated, w, 'kg').map((s) => s.name)).not.toContain('Goblet squats')
-    const push = sg.find((s) => s.name === 'Push-ups')!
-    expect(push.apply(r.exercises[1])).toMatchObject({ repMin: 10, repMax: 12 })
-  })
-  it('no suggestion below the top', () => {
-    const w = buildWorkout(r, fullSession(() => 9, 20), 5000, [])
-    expect(suggestions(r, w, 'kg')).toEqual([])
   })
 })
 
@@ -141,7 +121,7 @@ describe('break defaults', () => {
     expect(fb.exercises[0].rest).toBe(45)
     expect(fb.exercises.slice(1, 5).every((e) => e.rest === null)).toBe(true)
     expect(out.routines.find((r) => r.id === 'mine')!.exercises.every((e) => e.rest === 30)).toBe(true)
-    expect(out.presets).toBe(3)
+    expect(out.presets).toBe(4)
   })
 })
 
@@ -180,6 +160,36 @@ describe('v3 migration', () => {
     const out = withPresets({ version: 1, routines: [seedRoutine(), push, pull, mine], activeRoutineId: 'mine', history: [], settings: defaultSettings(), presets: 2 })
     expect(out.routines.map((x) => x.id)).toEqual(['seed-upper-body', 'mine'])
     expect(out.activeRoutineId).toBe('mine')
+  })
+
+  it('v4 adds dumbbell curls to an existing Upper Body routine, keeping user edits', async () => {
+    const { withPresets, seedRoutine, defaultSettings } = await import('./seed')
+    const old = seedRoutine()
+    old.exercises = old.exercises.filter((e) => e.id !== 's8').map((e) => (e.id === 's2' ? { ...e, weight: 2, notes: 'mine' } : e))
+    old.days = [0, 3]
+    const mine = { id: 'mine', name: 'Mine', exercises: [] }
+    const w = { id: 'w', routineId: 'seed-upper-body', routineName: 'Upper Body & Posture', start: 1, end: 2, exercises: [], prs: [] }
+    const out = withPresets({ version: 1, routines: [old, mine], activeRoutineId: 'mine', history: [w], settings: defaultSettings(), presets: 3 })
+    const up = out.routines.find((r) => r.id === 'seed-upper-body')!
+    expect(up.exercises.map((e) => e.id)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's8', 's7'])
+    expect(up.exercises[1]).toMatchObject({ weight: 2, notes: 'mine' })
+    expect(up.days).toEqual([0, 3])
+    expect(out.history).toEqual([w])
+    expect(out.activeRoutineId).toBe('mine')
+    expect(out.routines.find((r) => r.id === 'mine')).toEqual(mine)
+    // runs once
+    expect(withPresets(out)).toBe(out)
+  })
+
+  it('v4 skips the curl when the routine already has one, and appends at the end while a session runs on it', async () => {
+    const { withPresets, seedRoutine, defaultSettings } = await import('./seed')
+    const base = seedRoutine()
+    const withoutCurl = { ...base, exercises: base.exercises.filter((e) => e.id !== 's8') }
+    const ownCurl = { ...withoutCurl, exercises: [...withoutCurl.exercises, { ...base.exercises[0], id: 'x', name: 'Hammer curls' }] }
+    const d = (r: typeof base) => ({ version: 1 as const, routines: [r], activeRoutineId: r.id, history: [], settings: defaultSettings(), presets: 3 })
+    expect(withPresets(d(ownCurl)).routines[0].exercises.map((e) => e.id)).toEqual(ownCurl.exercises.map((e) => e.id))
+    const running = withPresets(d(withoutCurl), 'seed-upper-body').routines[0].exercises.map((e) => e.id)
+    expect(running).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'])
   })
 
   it('keeps an untouched retired preset that is active or has history', async () => {

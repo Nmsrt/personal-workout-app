@@ -356,6 +356,8 @@ h1.display { font-size: 2.75rem; }
 .rp-row.on .rp-mark { background: var(--signal); border-color: var(--signal); color: var(--on-signal); }
 .home .hero-meta { gap: 8px; margin-bottom: 20px; }
 .home .hero .btn.signal { font-weight: 700; }
+.hero-note { margin: 0 0 4px; color: var(--hero-muted); font-size: 0.95rem; line-height: 1.45; }
+.hero-note b { color: var(--hero-ink); font-weight: 600; }
 .home .section-head { margin-top: 22px; }
 .home .more-btn { margin-left: 2px; }
 .week-card { padding: 16px 18px 18px; }
@@ -379,10 +381,6 @@ h1.display { font-size: 2.75rem; }
 
 .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: var(--inset); color: var(--ink-2); vertical-align: 2px; margin-left: 6px; }
 
-.sugg { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--line); }
-.sugg:first-of-type { border-top: 0; padding-top: 2px; }
-.sugg strong { font-weight: 600; }
-.sugg .muted { font-size: 0.875rem; }
 
 /* ───────── Workout ───────── */
 .workout { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
@@ -486,7 +484,26 @@ h1.display { font-size: 2.75rem; }
 .ex-card-head .btn { width: 40px; min-height: 40px; padding: 0; background: transparent; border-color: transparent; color: var(--ink-2); }
 .ex-form { border-top: 1px solid var(--line); padding: 16px 14px; background: color-mix(in srgb, var(--inset) 45%, var(--surface)); }
 .ex-form .field input, .ex-form .field textarea, .ex-form .field select { background: var(--surface); border-color: var(--line); }
-.danger-zone { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--line); }
+.active-strip { display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 12px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.active-strip.on { border-color: var(--signal); background: var(--signal-soft); }
+.active-strip .grow { min-width: 0; flex: 1; }
+.as-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--inset); color: var(--ink-2); flex-shrink: 0; }
+.active-strip.on .as-icon { background: var(--signal); color: var(--on-signal); }
+.as-pill { margin: 0; background: var(--signal); color: var(--on-signal); flex-shrink: 0; }
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -8px -10px -4px 0; }
+.field-head label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.menu-wrap { position: relative; }
+/* Sections keep their entrance-animation transform, so each is its own layer; lift the open card above later ones. */
+.menu-host { position: relative; }
+.menu-host.open { z-index: 10; }
+.menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; width: min(290px, calc(100vw - 48px)); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 12px 32px rgb(0 0 0 / 0.18); overflow: hidden; animation: fade 0.15s both; }
+.row-btn { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); font: inherit; color: inherit; text-align: left; cursor: pointer; justify-content: flex-start; transition: background-color 0.15s var(--ease); }
+.row-btn:active:not(:disabled) { background: var(--inset); }
+.row-btn:disabled { cursor: default; opacity: 0.5; }
+.row-btn > svg { color: var(--muted); flex-shrink: 0; }
+.rb-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--inset); flex-shrink: 0; }
+.row-btn.danger .title, .row-btn.danger .rb-icon { color: var(--danger); }
+.row-btn.danger .rb-icon { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 
 /* ───────── Calendar / History ───────── */
 .cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
@@ -512,6 +529,10 @@ h1.display { font-size: 2.75rem; }
 .hist .chev { color: var(--muted); transition: transform 0.2s var(--ease); }
 .hist[open] .chev { transform: rotate(90deg); }
 .hist-body { padding: 0 14px 12px; border-top: 1px solid var(--line); }
+.hist-total { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 12px 14px; border-radius: var(--r); background: var(--signal-soft); border: 1px solid color-mix(in srgb, var(--signal) 55%, transparent); }
+.hist-total .label { flex: 1; color: var(--ink-2); }
+.hist-total-v { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink); }
+.hist-body .sum-row:has(+ .hist-total) { border-bottom: 0; }
 
 /* ───────── Progress ───────── */
 .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }

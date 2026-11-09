@@ -4,7 +4,7 @@ import { FormGuide, GuideThumb } from '../components/FormGuide'
 import { Icon } from '../components/Icon'
 import { Stepper } from '../components/NumInput'
 import { useCountdown, useTick, useWakeLock } from '../hooks'
-import { buildSteps, buildWorkout, logKey, restFor, suggestions } from '../logic'
+import { buildSteps, buildWorkout, logKey, restFor } from '../logic'
 import { useStore } from '../store'
 import type { Exercise, Routine, Session, SetLog, Settings, Step, Workout } from '../types'
 import { alertUser, fmtDuration, fmtTime, fmtW, fromDisp, scheduleCountdown, toDisp, unlockAudio, vibrateCue } from '../util'
@@ -16,7 +16,7 @@ interface Nav {
 }
 
 export function WorkoutScreen({ onExit }: { onExit: () => void }) {
-  const { data, update, updateRoutine, session, setSession } = useStore()
+  const { data, update, session, setSession } = useStore()
   const [finished, setFinished] = useState<Workout | null>(null)
   const [confirmEnd, setConfirmEnd] = useState(false)
   const routine = session ? data.routines.find((r) => r.id === session.routineId) : undefined
@@ -25,13 +25,10 @@ export function WorkoutScreen({ onExit }: { onExit: () => void }) {
   useTick(!!session, 1000)
 
   if (finished) {
-    const r = data.routines.find((x) => x.id === finished.routineId)
     return (
       <Summary
         w={finished}
-        routine={r}
         settings={s}
-        onApply={(exId, fn) => r && updateRoutine(r.id, (rt) => ({ ...rt, exercises: rt.exercises.map((e) => (e.id === exId ? fn(e) : e)) }))}
         onDone={() => {
           setFinished(null)
           onExit()
@@ -476,10 +473,9 @@ function TimeUp({ title, sub, onClose }: { title: string; sub?: string; onClose:
   )
 }
 
-function Summary({ w, routine, settings, onApply, onDone }: { w: Workout; routine?: Routine; settings: Settings; onApply: (exId: string, fn: (e: Exercise) => Exercise) => void; onDone: () => void }) {
+function Summary({ w, settings, onDone }: { w: Workout; settings: Settings; onDone: () => void }) {
   const sets = w.exercises.reduce((a, e) => a + e.sets.length, 0)
   const planned = w.exercises.reduce((a, e) => a + e.targetSets, 0)
-  const sugg = routine ? suggestions(routine, w, settings.units) : []
   return (
     <div className="screen summary">
       <div className="summary-hero">
@@ -516,24 +512,6 @@ function Summary({ w, routine, settings, onApply, onDone }: { w: Workout; routin
               </li>
             ))}
           </ul>
-        </section>
-      )}
-      {sugg.length > 0 && (
-        <section className="card">
-          <h3 className="card-title">
-            <Icon name="trend" size={18} /> Ready to progress
-          </h3>
-          {sugg.map((sg) => (
-            <div key={sg.exerciseId} className="sugg">
-              <div>
-                <strong>{sg.name}</strong>
-                <div className="muted">{sg.text}</div>
-              </div>
-              <button className="btn primary sm" onClick={() => onApply(sg.exerciseId, sg.apply)}>
-                Apply
-              </button>
-            </div>
-          ))}
         </section>
       )}
       <section className="card">

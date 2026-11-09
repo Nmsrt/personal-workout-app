@@ -49,6 +49,11 @@ function mount(data?: AppData) {
   )
 }
 
+/** Plans the default routine for every day so Home offers Start workout. */
+function everyDay(d: AppData): AppData {
+  return { ...d, routines: d.routines.map((r) => (r.id === 'seed-upper-body' ? { ...r, days: [0, 1, 2, 3, 4, 5, 6] } : r)) }
+}
+
 const tabbar = () => within(screen.getByRole('navigation', { name: 'Main' }))
 
 beforeEach(() => {
@@ -102,7 +107,7 @@ describe('navigation', () => {
 
 describe('workout flow', () => {
   it('start, log a set, end and save: adds to history without touching earlier workouts', () => {
-    const d = defaultData()
+    const d = everyDay(defaultData())
     d.history = [yesterdayWorkout()]
     mount(d)
     fireEvent.click(screen.getByRole('button', { name: /Start workout/ }))
@@ -121,12 +126,12 @@ describe('workout flow', () => {
   })
 
   it('bodyweight exercises show only the reps box', () => {
-    const d = defaultData()
+    const d = everyDay(defaultData())
     // Push-ups is the 2nd exercise of the default routine and has no weight
     mount(d)
     fireEvent.click(screen.getByRole('button', { name: /Start workout/ }))
     expect(screen.getByText(/^Weight/)).toBeTruthy()
-    fireEvent.click(screen.getByText(/Exercise 1 of 7/))
+    fireEvent.click(screen.getByText(/Exercise 1 of 8/))
     fireEvent.click(screen.getByRole('button', { name: 'Push-ups' }))
     expect(screen.getByRole('heading', { level: 2, name: 'Push-ups' })).toBeTruthy()
     expect(screen.queryByText(/^Weight/)).toBeNull()
@@ -182,6 +187,25 @@ describe('planned days', () => {
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Lower Body & Core')
   })
 
+  it('with nothing planned today, the hero says there is no session, with no start button or up next', () => {
+    const d = defaultData()
+    d.routines = d.routines.map((r) => (r.id === 'preset-full-body' ? { ...r, days: [(todayIdx + 1) % 7] } : r))
+    mount(d)
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('No session today')
+    expect(screen.getByText('Rest day')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Start workout/ })).toBeNull()
+    expect(screen.queryByText(/Up next/)).toBeNull()
+  })
+
+  it('Home no longer shows Ready to progress suggestions', () => {
+    const d = defaultData()
+    const y = yesterdayWorkout()
+    y.exercises[0].sets = [{ reps: 12, weight: 4, duration: 0 }, { reps: 12, weight: 4, duration: 0 }]
+    d.history = [y]
+    mount(d)
+    expect(screen.queryByText('Ready to progress')).toBeNull()
+  })
+
   it('a manual pick after the auto-pick sticks for the day', () => {
     const d = defaultData()
     d.autoPickDay = '2000-01-01'
@@ -191,6 +215,37 @@ describe('planned days', () => {
     unmount()
     mount()
     expect(savedData().activeRoutineId).toBe('preset-lower-core')
+  })
+
+  it('routine detail: active strip on top, manage actions at the bottom, no set counts or day hint', () => {
+    mount()
+    fireEvent.click(tabbar().getByRole('button', { name: 'Routines' }))
+    expect(screen.queryByText(/sets?/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Open Lower Body/ }))
+    expect(screen.queryByText(/Pick days/)).toBeNull()
+    expect(screen.queryByText(/sets?/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Make active' })).toBeNull()
+    expect(screen.getByText('Not active')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Tuesday' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Saturday' }))
+    expect(screen.getByText('Active routine')).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /Duplicate routine/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Manage routine' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Duplicate routine/ }))
+    expect(savedData().routines.map((r) => r.name)).toContain('Lower Body & Core (copy)')
+    fireEvent.click(screen.getByRole('button', { name: 'Manage routine' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Delete routine/ }))
+    expect(savedData().routines.map((r) => r.name)).not.toContain('Lower Body & Core (copy)')
+  })
+
+  it('every routine with a planned day is active, so several can be active at once', () => {
+    const d = defaultData()
+    d.routines = d.routines.map((r) => (r.id === 'seed-upper-body' ? { ...r, days: [0] } : r.id === 'preset-full-body' ? { ...r, days: [2, 4] } : r))
+    mount(d)
+    fireEvent.click(tabbar().getByRole('button', { name: 'Routines' }))
+    const cards = screen.getAllByRole('button', { name: /^Open / })
+    expect(cards.map((c) => c.textContent?.includes('Active'))).toEqual([true, true, false])
+    expect(cards[2].getAttribute('aria-label')).toBe('Open Lower Body & Core')
   })
 
   it('days set in the routine editor are saved', () => {

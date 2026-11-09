@@ -16,6 +16,9 @@ const ex = (id: string, name: string, p: Partial<Exercise>): Exercise => ({
   ...p
 })
 
+/** Added to Upper Body & Posture in preset v4. */
+const dumbbellCurls = () => ex('s8', 'Dumbbell curls', { repMin: 10, repMax: 12, weight: 4, notes: 'Elbows pinned to sides, palms up, slow on the way down.' })
+
 export function seedRoutine(): Routine {
   return {
     id: SEED_ID,
@@ -27,6 +30,7 @@ export function seedRoutine(): Routine {
       ex('s4', 'Overhead press', { repMin: 10, repMax: 12, weight: 4 }),
       ex('s5', 'Lateral raises', { repMin: 12, repMax: 12, weight: 4, notes: 'Raise to shoulder height, slow on the way down.' }),
       ex('s6', 'Reverse flyes', { repMin: 12, repMax: 12, weight: 4, notes: 'Bent over, lead with elbows.' }),
+      dumbbellCurls(),
       ex('s7', 'Plank', { type: 'timed', repMin: 0, repMax: 0, duration: 30, notes: 'Straight line head to heels. Aim 25-30 s.' })
     ],
   }
@@ -74,7 +78,7 @@ export const PRESETS: Record<string, () => Routine> = {
   'preset-lower-core': lowerBodyRoutine,
   'preset-full-body': fullBodyRoutine
 }
-export const PRESET_VERSION = 3
+export const PRESET_VERSION = 4
 /** Original contents of built-in routines retired in v3. Used only to tell untouched copies from edited ones. */
 const RETIRED: Record<string, () => Exercise[]> = {
   'preset-push': () => [
@@ -135,6 +139,18 @@ export function withPresets(d: AppData, inUse?: string): AppData {
     // active, in progress, or in history, since Restore presets can't bring them back.
     const used = new Set([d.activeRoutineId, inUse, ...d.history.map((w) => w.routineId)])
     routines = routines.filter((r) => used.has(r.id) || !untouchedRetired(r))
+  }
+  if (v < 4) {
+    // v4 added dumbbell curls to Upper Body & Posture. Inserted before the plank; the rest of the routine is
+    // kept as the user left it. Skipped when it already has a curl (e.g. the user added one). Appended at the end
+    // instead while a session on it is running, so the session's step index still points at the same set.
+    routines = routines.map((r) => {
+      if (r.id !== SEED_ID || r.exercises.some((e) => /curl/i.test(e.name) || e.id === 's8')) return r
+      const at = inUse === SEED_ID ? -1 : r.exercises.findIndex((e) => e.id === 's7')
+      const exercises = [...r.exercises]
+      exercises.splice(at < 0 ? exercises.length : at, 0, dumbbellCurls())
+      return { ...r, exercises }
+    })
   }
   if (!routines.length) routines = [seedRoutine()]
   const activeRoutineId = routines.some((r) => r.id === d.activeRoutineId) ? d.activeRoutineId : routines[0].id

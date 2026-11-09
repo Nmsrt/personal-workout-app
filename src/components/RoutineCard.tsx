@@ -19,7 +19,6 @@ interface Props {
 }
 
 export function RoutineCard({ r, active, settings, history, onClick }: Props) {
-  const sets = r.exercises.reduce((a, e) => a + e.sets, 0)
   const when = formatDays(r.days)
   return (
     <div className={`routine-card${active ? ' active' : ''}`}>
@@ -31,9 +30,6 @@ export function RoutineCard({ r, active, settings, history, onClick }: Props) {
         <div className="rc-meta">
           <span>
             <b>{r.exercises.length}</b> {plural(r.exercises.length, 'exercise')}
-          </span>
-          <span>
-            <b>{sets}</b> {plural(sets, 'set')}
           </span>
           <span>
             ~<b>{estimateMin(r, settings)}</b> min

@@ -20,6 +20,8 @@ function move<T>(arr: T[], i: number, d: number): T[] {
   return out
 }
 
+const isActive = (r: Routine) => (r.days?.length ?? 0) > 0
+
 const newExercise = (): Exercise => ({ id: uid(), name: 'New exercise', type: 'reps', sets: 2, repMin: 8, repMax: 12, weight: 0, duration: 30, rest: null, notes: '' })
 
 /** Routines tab: list of routines first; tapping one opens its contents. */
@@ -55,7 +57,8 @@ export function Routines() {
     setFreshExercise(ex.id)
     setOpenRoutine(nr.id)
   }
-  const sorted = [...data.routines].sort((a, b) => Number(b.id === data.activeRoutineId) - Number(a.id === data.activeRoutineId))
+  // A routine is active when it is planned for at least one day. Active ones list first.
+  const sorted = [...data.routines].sort((a, b) => Number(isActive(b)) - Number(isActive(a)))
 
   return (
     <div className="screen">
@@ -63,7 +66,7 @@ export function Routines() {
 
       <div className="routine-list">
         {sorted.map((r) => (
-          <RoutineCard key={r.id} r={r} active={r.id === data.activeRoutineId} settings={data.settings} history={data.history} onClick={() => setOpenRoutine(r.id)} />
+          <RoutineCard key={r.id} r={r} active={isActive(r)} settings={data.settings} history={data.history} onClick={() => setOpenRoutine(r.id)} />
         ))}
       </div>
 
@@ -83,8 +86,23 @@ export function Routines() {
 function RoutineDetail({ r, initialOpen, onBack, onOpen }: { r: Routine; initialOpen: string | null; onBack: () => void; onOpen: (id: string, exId?: string) => void }) {
   const { data, update, updateRoutine, resetPreset } = useStore()
   const [openId, setOpenId] = useState<string | null>(initialOpen)
-  const isActive = r.id === data.activeRoutineId
-  const sets = r.exercises.reduce((a, e) => a + e.sets, 0)
+  const active = isActive(r)
+  const onlyOne = data.routines.length <= 1
+  const [manageOpen, setManageOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close the manage menu on a tap outside it or Escape.
+  useEffect(() => {
+    if (!manageOpen) return
+    const away = (e: PointerEvent) => !menuRef.current?.contains(e.target as Node) && setManageOpen(false)
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setManageOpen(false)
+    document.addEventListener('pointerdown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('pointerdown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [manageOpen])
 
   const duplicate = () => {
     const nr: Routine = { ...structuredClone(r), id: uid(), name: `${r.name} (copy)` }
@@ -93,7 +111,7 @@ function RoutineDetail({ r, initialOpen, onBack, onOpen }: { r: Routine; initial
     onOpen(nr.id)
   }
   const del = () => {
-    if (data.routines.length <= 1) return alert('You need at least one routine.')
+    if (onlyOne) return
     if (!confirm(`Delete routine "${r.name}"? Workout history is kept.`)) return
     const rest = data.routines.filter((x) => x.id !== r.id)
     update((d) => ({ ...d, routines: rest, activeRoutineId: d.activeRoutineId === r.id ? rest[0].id : d.activeRoutineId }))
@@ -110,37 +128,77 @@ function RoutineDetail({ r, initialOpen, onBack, onOpen }: { r: Routine; initial
     <div className="screen">
       <PageTitle
         title={r.name || 'Untitled'}
-        sub={`${r.exercises.length} exercise${r.exercises.length === 1 ? '' : 's'} · ${sets} set${sets === 1 ? '' : 's'}`}
+        sub={`${r.exercises.length} exercise${r.exercises.length === 1 ? '' : 's'}`}
         onBack={onBack}
         backLabel="All routines"
       />
 
-      <section className="card form-stack">
-        <label className="field">
-          <span>Routine name</span>
-          <input value={r.name} onChange={(e) => updateRoutine(r.id, (rt) => ({ ...rt, name: e.target.value }))} />
-        </label>
+      <section className={`active-strip${active ? ' on' : ''}`} aria-label="Active routine">
+        <span className="as-icon" aria-hidden>
+          <Icon name={active ? 'check' : 'calendar'} size={18} />
+        </span>
+        <div className="grow">
+          <strong>{active ? 'Active routine' : 'Not active'}</strong>
+          {!active && <div className="muted small">Plan at least one day to make it active.</div>}
+        </div>
+        {active && <span className="tag as-pill">Active</span>}
+      </section>
+
+      <section className={`card form-stack menu-host${manageOpen ? ' open' : ''}`}>
+        <div className="field">
+          <div className="field-head">
+            <label htmlFor="routine-name">Routine name</label>
+            <div className="menu-wrap" ref={menuRef}>
+              <button
+                className="btn icon-only ghost sm"
+                aria-label="Manage routine"
+                aria-haspopup="menu"
+                aria-expanded={manageOpen}
+                onClick={() => setManageOpen(!manageOpen)}
+              >
+                <Icon name="dots" size={20} stroke={3} />
+              </button>
+              {manageOpen && (
+                <div className="menu" role="menu" aria-label="Manage routine">
+                  <button role="menuitem" className="row-item row-btn" onClick={() => { setManageOpen(false); duplicate() }}>
+                    <span className="rb-icon" aria-hidden>
+                      <Icon name="copy" size={18} />
+                    </span>
+                    <div className="grow">
+                      <div className="title">Duplicate routine</div>
+                      <div className="sub">Make a copy to edit separately</div>
+                    </div>
+                  </button>
+                  {PRESETS[r.id] && (
+                    <button role="menuitem" className="row-item row-btn" onClick={() => { setManageOpen(false); if (confirm(`Reset "${PRESETS[r.id]().name}" to its default exercises?`)) resetPreset(r.id) }}>
+                      <span className="rb-icon" aria-hidden>
+                        <Icon name="reset" size={18} />
+                      </span>
+                      <div className="grow">
+                        <div className="title">Reset to default</div>
+                        <div className="sub">Restore the built-in exercises</div>
+                      </div>
+                    </button>
+                  )}
+                  <button role="menuitem" className="row-item row-btn danger" disabled={onlyOne} onClick={() => { setManageOpen(false); del() }}>
+                    <span className="rb-icon" aria-hidden>
+                      <Icon name="trash" size={18} />
+                    </span>
+                    <div className="grow">
+                      <div className="title">Delete routine</div>
+                      <div className="sub">{onlyOne ? 'You need at least one routine' : 'Workout history is kept'}</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <input id="routine-name" value={r.name} onChange={(e) => updateRoutine(r.id, (rt) => ({ ...rt, name: e.target.value }))} />
+        </div>
         <div className="field">
           <span>Planned days</span>
           <DayPicker value={r.days ?? []} onChange={(days) => updateRoutine(r.id, (rt) => ({ ...rt, days }))} />
-          <small className="muted small">{r.days?.length ? `${formatDays(r.days)}. Shows first on Home on those days.` : 'Pick days to plan this routine. Optional.'}</small>
-        </div>
-        <div className="btn-row wrap">
-          {isActive ? (
-            <span className="tag" style={{ margin: 0, alignSelf: 'center' }}>
-              Active routine
-            </span>
-          ) : (
-            <button className="btn primary sm" onClick={() => update((d) => ({ ...d, activeRoutineId: r.id }))}>
-              Make active
-            </button>
-          )}
-          <button className="btn sm" onClick={duplicate}>
-            <Icon name="copy" size={16} /> Duplicate
-          </button>
-          <button className="btn danger sm" onClick={del}>
-            <Icon name="trash" size={16} /> Delete
-          </button>
+          {r.days?.length ? <small className="muted small">{formatDays(r.days)}. Shows first on Home on those days.</small> : null}
         </div>
       </section>
 
@@ -170,13 +228,6 @@ function RoutineDetail({ r, initialOpen, onBack, onOpen }: { r: Routine; initial
         </button>
       </div>
 
-      {PRESETS[r.id] && (
-        <div className="danger-zone">
-          <button className="btn danger block" onClick={() => confirm(`Reset "${PRESETS[r.id]().name}" to its default exercises?`) && resetPreset(r.id)}>
-            <Icon name="reset" size={18} /> Reset to default
-          </button>
-        </div>
-      )}
     </div>
   )
 }
