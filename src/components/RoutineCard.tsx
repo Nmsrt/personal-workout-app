@@ -1,6 +1,8 @@
 import { DAY_LETTERS, DAY_NAMES, estimateMin, formatDays } from '../logic'
 import type { Routine, Settings, Workout } from '../types'
+import { MUSCLE_LABELS, routineMuscles } from '../muscles'
 import { Icon } from './Icon'
+import { MuscleMap } from './MuscleMap'
 
 function lastDone(history: Workout[], routineId: string): Workout | undefined {
   let last: Workout | undefined
@@ -21,20 +23,28 @@ interface Props {
 export function RoutineCard({ r, active, settings, history, onClick }: Props) {
   const when = formatDays(r.days)
   const last = lastDone(history, r.id)
+  const muscles = routineMuscles(r)
+  const focus = muscles.ranked.filter((m) => muscles.tiers[m]! >= 2).slice(0, 3).map((m) => MUSCLE_LABELS[m])
   return (
     <div className={`routine-card${active ? ' active' : ''}`}>
       <button className="rc-btn" onClick={onClick} aria-label={`Open ${r.name}`}>
-        <div className="rc-top">
-          <span className="rc-name">{r.name || 'Untitled'}</span>
-          {active && <span className="tag rc-active">Active</span>}
-        </div>
-        <div className="rc-meta">
-          <span>
-            <b>{r.exercises.length}</b> {plural(r.exercises.length, 'exercise')}
-          </span>
-          <span>
-            ~<b>{estimateMin(r, settings)}</b> min
-          </span>
+        <div className="rc-main">
+          <div className="rc-info">
+            <div className="rc-top">
+              <span className="rc-name">{r.name || 'Untitled'}</span>
+              {active && <span className="tag rc-active">Active</span>}
+            </div>
+            <div className="rc-meta">
+              <span>
+                <b>{r.exercises.length}</b> {plural(r.exercises.length, 'exercise')}
+              </span>
+              <span>
+                ~<b>{estimateMin(r, settings)}</b> min
+              </span>
+            </div>
+            {focus.length > 0 && <div className="rc-focus">{focus.join(' · ')}</div>}
+          </div>
+          {muscles.ranked.length > 0 && <MuscleMap summary={muscles} />}
         </div>
         <div className="rc-foot">
           {r.days?.length ? (

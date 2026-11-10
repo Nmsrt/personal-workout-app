@@ -596,6 +596,18 @@ h1.display { font-size: 2.75rem; }
 .rc-active { background: var(--signal); color: var(--on-signal); margin: 2px 0 0; flex-shrink: 0; }
 .rc-meta { display: flex; gap: 14px; margin-top: 8px; font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rc-meta b { color: var(--ink); font-weight: 700; }
+.rc-main { display: flex; align-items: flex-start; gap: 12px; }
+.rc-info { flex: 1; min-width: 0; }
+.rc-focus { margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--ink-2); }
+.muscle-map { display: flex; gap: 2px; flex-shrink: 0; margin: -4px -4px -2px 0; }
+.mm-view { width: 42px; height: 88px; display: block; }
+.mm-part { fill: var(--inset-2); }
+.mm-part.t1 { fill: color-mix(in srgb, var(--signal) 22%, var(--inset-2)); }
+.mm-part.t2 { fill: color-mix(in srgb, var(--signal) 50%, var(--inset-2)); }
+.mm-part.t3 { fill: var(--signal); stroke: var(--ink); stroke-width: 1.2; stroke-linejoin: round; }
+:root[data-theme='dark'] .mm-part.t1 { fill: color-mix(in srgb, var(--signal) 30%, var(--inset-2)); }
+:root[data-theme='dark'] .mm-part.t2 { fill: color-mix(in srgb, var(--signal) 65%, var(--inset-2)); }
+:root[data-theme='dark'] .mm-part.t3 { stroke: none; }
 .rc-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); }
 .rc-days { display: flex; gap: 3px; }
 .rc-days span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 0.66rem; font-weight: 700; background: var(--signal); color: var(--on-signal); }
