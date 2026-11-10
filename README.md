@@ -2,7 +2,7 @@
 
 A mobile-first workout tracker that works offline and installs on your phone as a Progressive Web App (PWA). It uses React, Vite and TypeScript, with plain CSS. All data stays on your device in `localStorage`. There is no backend and no account.
 
-On first launch it loads three routines built for two 4 kg dumbbells plus bodyweight: **Upper Body & Posture** (the default), **Lower Body & Core** and **Full Body Express**. You can edit every part of them in the app, and each one can be reset to its default.
+On first launch it loads routines built for two 4 kg dumbbells plus bodyweight: **Starter Routine** (the default) and a weekly split, **Push**, **Legs**, **Pull**, **Lower + Core** and **Upper Pump**, which start with no days planned. You can edit every part of them in the app, plan them on any days, reset each to its default, and add your own routines.
 
 ## Features
 

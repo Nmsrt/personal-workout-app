@@ -42,7 +42,8 @@ export function normalize(x: unknown): AppData {
     presets: typeof d.presets === 'number' ? d.presets : undefined,
     lastBackup: typeof d.lastBackup === 'number' ? d.lastBackup : undefined,
     backupSnoozeUntil: typeof d.backupSnoozeUntil === 'number' ? d.backupSnoozeUntil : undefined,
-    autoPickDay: typeof d.autoPickDay === 'string' ? d.autoPickDay : undefined
+    autoPickDay: typeof d.autoPickDay === 'string' ? d.autoPickDay : undefined,
+    restoreDismissed: Array.isArray(d.restoreDismissed) ? d.restoreDismissed.filter((x): x is string => typeof x === 'string') : undefined
   }
 }
 

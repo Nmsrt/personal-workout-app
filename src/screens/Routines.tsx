@@ -58,6 +58,7 @@ export function Routines() {
     setOpenRoutine(nr.id)
   }
   // A routine is active when it is planned for at least one day. Active ones list first.
+  const missing = Object.keys(PRESETS).filter((id) => !data.routines.some((x) => x.id === id))
   const sorted = [...data.routines].sort((a, b) => Number(isActive(b)) - Number(isActive(a)))
 
   return (
@@ -74,10 +75,16 @@ export function Routines() {
         <Icon name="plus" size={18} /> New routine
       </button>
 
-      {Object.keys(PRESETS).some((id) => !data.routines.some((x) => x.id === id)) && (
-        <button className="text-btn" style={{ marginTop: 8 }} onClick={restorePresets}>
-          <Icon name="reset" size={16} /> Restore built-in routines
-        </button>
+      {/* Shown while a built-in routine is missing, until dismissed. Deleting another one later shows it again. */}
+      {missing.some((id) => !data.restoreDismissed?.includes(id)) && (
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button className="text-btn" onClick={restorePresets}>
+            <Icon name="reset" size={16} /> Restore built-in routines
+          </button>
+          <button className="text-btn" aria-label="Hide restore built-in routines" onClick={() => update((d) => ({ ...d, restoreDismissed: missing }))}>
+            <Icon name="x" size={16} />
+          </button>
+        </div>
       )}
     </div>
   )
@@ -198,7 +205,7 @@ function RoutineDetail({ r, initialOpen, onBack, onOpen }: { r: Routine; initial
         <div className="field">
           <span>Planned days</span>
           <DayPicker value={r.days ?? []} onChange={(days) => updateRoutine(r.id, (rt) => ({ ...rt, days }))} />
-          {r.days?.length ? <small className="muted small">{formatDays(r.days)}. Shows first on Home on those days.</small> : null}
+          {r.days?.length ? <small className="muted small">{formatDays(r.days)}</small> : null}
         </div>
       </section>
 

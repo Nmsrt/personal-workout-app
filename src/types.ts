@@ -96,6 +96,8 @@ export interface AppData {
   lastBackup?: number
   /** backup reminder hidden until this ms timestamp */
   backupSnoozeUntil?: number
+  /** built-in routine ids that were missing when the user dismissed the Restore prompt */
+  restoreDismissed?: string[]
   /** day key (YYYY-MM-DD) when Home last auto-picked today's scheduled routine */
   autoPickDay?: string
 }

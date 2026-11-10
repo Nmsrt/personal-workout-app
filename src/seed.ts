@@ -16,13 +16,13 @@ const ex = (id: string, name: string, p: Partial<Exercise>): Exercise => ({
   ...p
 })
 
-/** Added to Upper Body & Posture in preset v4. */
+/** Added to the starter routine in preset v4. */
 const dumbbellCurls = () => ex('s8', 'Dumbbell curls', { repMin: 10, repMax: 12, weight: 4, notes: 'Elbows pinned to sides, palms up, slow on the way down.' })
 
 export function seedRoutine(): Routine {
   return {
     id: SEED_ID,
-    name: 'Upper Body & Posture',
+    name: 'Starter Routine',
     exercises: [
       ex('s1', 'Goblet squats', { repMin: 10, repMax: 12, weight: 4, notes: 'Hold one dumbbell at chest. Sit back and down, chest up.' }),
       ex('s2', 'Push-ups', { repMin: 8, repMax: 10, notes: 'Bodyweight. Knees down if needed.' }),
@@ -36,7 +36,91 @@ export function seedRoutine(): Routine {
   }
 }
 
-/* ───── Extra built-in routines (same kit: two 4 kg dumbbells + bodyweight) ───── */
+/* ───── Weekly split (v7). Built in but not planned on any day; the user assigns days when ready. ───── */
+
+const reps = (id: string, name: string, sets: number, repMin: number, repMax: number, weight: number, notes = ''): Exercise =>
+  ex(id, name, { sets, repMin, repMax, weight, notes })
+const hold = (id: string, name: string, sets: number, duration: number, notes = ''): Exercise =>
+  ex(id, name, { type: 'timed', repMin: 0, repMax: 0, sets, duration, notes })
+
+const MAX = 'Max reps: as many as you can with clean form.'
+
+// A lift that appears in several built-in routines shares one exercise id (the starter's where it has one),
+// because PRs and progress are tracked per exercise id. Ids only need to be unique within a routine.
+
+export function pushRoutine(): Routine {
+  return {
+    id: 'split-push',
+    name: 'Push',
+    exercises: [
+      reps('s2', 'Push-ups', 3, 8, 15, 0, MAX),
+      reps('mo2', 'Single-arm overhead press', 3, 12, 15, 4, 'Reps per arm. Brace core, press straight up.'),
+      reps('s5', 'Lateral raises', 3, 15, 20, 4, 'Raise to shoulder height, slow on the way down.'),
+      reps('tx1', 'Overhead triceps extension', 3, 15, 15, 8, 'Hold both dumbbells together overhead, elbows pointing up.'),
+      reps('mo5', 'Close-grip push-ups', 2, 6, 12, 0, 'Hands under shoulders, elbows tucked. ' + MAX)
+    ]
+  }
+}
+
+export function legsRoutine(): Routine {
+  return {
+    id: 'split-legs',
+    name: 'Legs',
+    exercises: [
+      reps('tu1', 'Bulgarian split squats', 3, 10, 12, 0, 'Reps per leg. Back foot on a chair.'),
+      reps('s1', 'Goblet squats', 3, 15, 20, 8, 'Hold both dumbbells at chest. 4-second lowering.'),
+      reps('tu3', 'Single-leg glute bridge', 3, 15, 15, 0, 'Reps per leg. Squeeze at the top.'),
+      reps('tu4', 'Single-leg calf raises', 3, 15, 20, 0, 'Reps per leg. On a stair edge, full range.'),
+      hold('tu5', 'Wall sit', 2, 45, 'Thighs parallel to the floor, back flat on the wall.')
+    ]
+  }
+}
+
+export function pullRoutine(): Routine {
+  return {
+    id: 'split-pull',
+    name: 'Pull',
+    exercises: [
+      reps('we1', 'One-arm rows', 3, 12, 15, 4, 'Reps per arm. Free hand on a chair or knee.'),
+      reps('s6', 'Reverse flyes', 3, 15, 20, 4, 'Bent over, lead with elbows.'),
+      reps('we3', 'Superman holds', 3, 12, 12, 0, 'Face down, lift arms and legs, short hold each rep.'),
+      reps('s8', 'Dumbbell curls', 3, 12, 15, 4, 'Elbows pinned to sides, slow on the way down.'),
+      reps('we5', 'Hammer curls', 2, 12, 15, 4, 'Palms face each other.')
+    ]
+  }
+}
+
+export function lowerCoreRoutine(): Routine {
+  return {
+    id: 'split-lower-core',
+    name: 'Lower + Core',
+    exercises: [
+      reps('th1', 'Single-leg RDL', 3, 10, 10, 4, 'Reps per leg. Hips back, flat back.'),
+      reps('th2', 'Reverse lunges', 3, 12, 12, 4, 'Reps per leg. One dumbbell in each hand.'),
+      reps('th3', 'Paused glute bridge', 3, 15, 15, 0, 'Pause 2 s at the top.'),
+      hold('s7', 'Plank', 3, 45, 'Straight line head to heels.'),
+      reps('th5', 'Dead bugs', 3, 10, 10, 0, 'Reps per side. Lower back stays flat on the floor.'),
+      reps('th6', 'Leg raises', 2, 12, 12, 0, 'Lying on your back, lower back pressed down.')
+    ]
+  }
+}
+
+export function upperPumpRoutine(): Routine {
+  return {
+    id: 'split-upper-pump',
+    name: 'Upper Pump',
+    exercises: [
+      reps('fr1', 'Feet-elevated push-ups', 3, 6, 12, 0, 'Feet on a chair. ' + MAX),
+      reps('s3', 'Bent-over rows', 3, 15, 15, 4, 'Hinge at hips, flat back, squeeze shoulder blades.'),
+      reps('s5', 'Lateral raises', 2, 20, 20, 4, 'Raise to shoulder height, slow on the way down.'),
+      reps('s8', 'Dumbbell curls', 2, 15, 15, 4, 'Superset with triceps extensions: alternate sets, short rest.'),
+      reps('tx1', 'Overhead triceps extension', 2, 15, 15, 8, 'Superset with curls: alternate sets, short rest.'),
+      hold('s7', 'Plank', 2, 45, 'Max hold: as long as you can with good form.')
+    ]
+  }
+}
+
+/* ───── Built-in routines retired in v6. Kept to migrate old data and to tell untouched copies from edited ones. ───── */
 
 const timed = (id: string, name: string, duration: number, notes: string, sets = 2): Exercise =>
   ex(id, name, { type: 'timed', repMin: 0, repMax: 0, duration, notes, sets })
@@ -75,12 +159,17 @@ export function fullBodyRoutine(): Routine {
 /** Built-in routines, in display order. Used for fresh installs, migration and "reset to default". */
 export const PRESETS: Record<string, () => Routine> = {
   [SEED_ID]: seedRoutine,
-  'preset-lower-core': lowerBodyRoutine,
-  'preset-full-body': fullBodyRoutine
+  'split-push': pushRoutine,
+  'split-legs': legsRoutine,
+  'split-pull': pullRoutine,
+  'split-lower-core': lowerCoreRoutine,
+  'split-upper-pump': upperPumpRoutine
 }
-export const PRESET_VERSION = 4
-/** Original contents of built-in routines retired in v3. Used only to tell untouched copies from edited ones. */
+export const PRESET_VERSION = 8
+/** Original contents of retired built-in routines (Push/Pull in v3, Lower/Full in v6). Used only to tell untouched copies from edited ones. */
 const RETIRED: Record<string, () => Exercise[]> = {
+  'preset-lower-core': () => lowerBodyRoutine().exercises,
+  'preset-full-body': () => fullBodyRoutine().exercises,
   'preset-push': () => [
     ex('pu1', 'Push-ups', { sets: 3, repMin: 8, repMax: 12, notes: 'Elbows ~45° from body. Knees down if needed.' }),
     ex('pu2', 'Floor press', { sets: 3, repMin: 12, repMax: 15, weight: 4, notes: 'Lie on floor, press dumbbells up, elbows touch floor lightly.' }),
@@ -100,15 +189,20 @@ const RETIRED: Record<string, () => Exercise[]> = {
     timed('pl7', 'Superman hold', 20, 'Face down, lift arms and legs, squeeze upper back.')
   ]
 }
-const RETIRED_NAMES: Record<string, string> = { 'preset-push': 'Push Day', 'preset-pull': 'Pull Day' }
+const RETIRED_NAMES: Record<string, string> = {
+  'preset-push': 'Push Day',
+  'preset-pull': 'Pull Day',
+  'preset-lower-core': 'Lower Body & Core',
+  'preset-full-body': 'Full Body Express'
+}
 
 const EX_KEYS: (keyof Exercise)[] = ['id', 'name', 'type', 'sets', 'repMin', 'repMax', 'weight', 'duration', 'rest', 'notes', 'illustration', 'photo']
 const sameExercise = (a: Exercise, b: Exercise) => EX_KEYS.every((k) => a[k] === b[k])
 
-/** True when a retired preset still has its original contents. Edited copies are kept as the user's own. */
+/** True when a retired preset still has its original contents and no planned days. Edited or planned copies are kept as the user's own. */
 function untouchedRetired(r: Routine): boolean {
   const make = RETIRED[r.id]
-  if (!make || r.name !== RETIRED_NAMES[r.id]) return false
+  if (!make || r.name !== RETIRED_NAMES[r.id] || r.days?.length) return false
   const orig = make()
   return r.exercises.length === orig.length && r.exercises.every((e, i) => sameExercise(e, orig[i]))
 }
@@ -121,13 +215,10 @@ export function withPresets(d: AppData, inUse?: string): AppData {
   const v = d.presets ?? 0
   if (v >= PRESET_VERSION) return d
   let routines = d.routines
-  if (v < 1) {
-    const have = new Set(routines.map((r) => r.id))
-    const missing = Object.entries(PRESETS)
-      .filter(([id]) => id !== SEED_ID && !have.has(id))
-      .map(([, make]) => make())
-    routines = [...routines, ...missing]
-  }
+  // Retired presets are no longer in PRESETS, so Restore presets can't bring them back. A migration only drops an
+  // untouched copy the user never used: one that is active, in progress, in history or planned on a day stays.
+  const used = new Set([d.activeRoutineId, inUse, ...d.history.map((w) => w.routineId)])
+  // v1 added Lower Body & Core and Full Body Express. Both were retired again in v6 and are not re-added here.
   if (v < 2) {
     // v2: Full Body Express used 30 s rests; breaks now default to the 1-minute setting
     routines = routines.map((r) =>
@@ -135,13 +226,11 @@ export function withPresets(d: AppData, inUse?: string): AppData {
     )
   }
   if (v < 3) {
-    // v3 retired Push/Pull. Drop untouched copies only if the user never used them: keep any that are
-    // active, in progress, or in history, since Restore presets can't bring them back.
-    const used = new Set([d.activeRoutineId, inUse, ...d.history.map((w) => w.routineId)])
+    // v3 retired Push/Pull (see `used` above)
     routines = routines.filter((r) => used.has(r.id) || !untouchedRetired(r))
   }
   if (v < 4) {
-    // v4 added dumbbell curls to Upper Body & Posture. Inserted before the plank; the rest of the routine is
+    // v4 added dumbbell curls to the starter routine (then named Upper Body & Posture). Inserted before the plank; the rest of the routine is
     // kept as the user left it. Skipped when it already has a curl (e.g. the user added one). Appended at the end
     // instead while a session on it is running, so the session's step index still points at the same set.
     routines = routines.map((r) => {
@@ -152,9 +241,27 @@ export function withPresets(d: AppData, inUse?: string): AppData {
       return { ...r, exercises }
     })
   }
+  if (v < 5) {
+    // v5 renamed Upper Body & Posture to Starter Routine. Only the name changes, and only if the user kept the old one.
+    routines = routines.map((r) => (r.id === SEED_ID && r.name === 'Upper Body & Posture' ? { ...r, name: 'Starter Routine' } : r))
+  }
+  if (v < 6) {
+    // v6 retired Lower Body & Core and Full Body Express, leaving the starter routine as the only general one.
+    routines = routines.filter((r) => !(r.id === 'preset-lower-core' || r.id === 'preset-full-body') || used.has(r.id) || !untouchedRetired(r))
+  }
+  if (v < 7) {
+    // v7 added the weekly split (Push, Legs, Pull, Lower + Core, Upper Pump), with no days planned
+    const have = new Set(routines.map((r) => r.id))
+    routines = [...routines, ...Object.entries(PRESETS).filter(([id]) => id !== SEED_ID && !have.has(id)).map(([, make]) => make())]
+  }
+  let history = d.history
+  if (v < 8) {
+    // v8: past starter-routine workouts show the new name in History too. Only the label changes.
+    history = history.map((w) => (w.routineId === SEED_ID && w.routineName === 'Upper Body & Posture' ? { ...w, routineName: 'Starter Routine' } : w))
+  }
   if (!routines.length) routines = [seedRoutine()]
   const activeRoutineId = routines.some((r) => r.id === d.activeRoutineId) ? d.activeRoutineId : routines[0].id
-  return { ...d, routines, activeRoutineId, presets: PRESET_VERSION }
+  return { ...d, routines, history, activeRoutineId, presets: PRESET_VERSION }
 }
 
 export const defaultSettings = (): Settings => ({

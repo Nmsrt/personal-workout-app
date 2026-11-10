@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
-import { defaultData } from './seed'
+import { defaultData, fullBodyRoutine, lowerBodyRoutine } from './seed'
 import { StoreProvider } from './store'
 import type { AppData, Workout } from './types'
 
@@ -18,7 +18,7 @@ function yesterdayWorkout(): Workout {
   return {
     id: 'w-yesterday',
     routineId: 'seed-upper-body',
-    routineName: 'Upper Body & Posture',
+    routineName: 'Starter Routine',
     start,
     end: start + 30 * 60000,
     prs: [],
@@ -52,6 +52,12 @@ function mount(data?: AppData) {
 /** Plans the default routine for every day so Home offers Start workout. */
 function everyDay(d: AppData): AppData {
   return { ...d, routines: d.routines.map((r) => (r.id === 'seed-upper-body' ? { ...r, days: [0, 1, 2, 3, 4, 5, 6] } : r)) }
+}
+
+/** Starter routine plus two user routines, for tests that need a known set of several. */
+function threeRoutines(): AppData {
+  const d = defaultData()
+  return { ...d, routines: [d.routines[0], lowerBodyRoutine(), fullBodyRoutine()] }
 }
 
 const tabbar = () => within(screen.getByRole('navigation', { name: 'Main' }))
@@ -162,7 +168,7 @@ describe('planned days', () => {
   const todayIdx = (new Date().getDay() + 6) % 7
 
   it('on a new day, Home picks the routine planned for today and shows it in the week plan', () => {
-    const d = defaultData()
+    const d = threeRoutines()
     d.activeRoutineId = 'seed-upper-body'
     d.autoPickDay = '2000-01-01'
     d.routines = d.routines.map((r) => (r.id === 'preset-full-body' ? { ...r, days: [todayIdx] } : r))
@@ -183,7 +189,7 @@ describe('planned days', () => {
   })
 
   it('a finished workout shows as done in the week plan', () => {
-    const d = defaultData()
+    const d = threeRoutines()
     d.routines = d.routines.map((r) => (r.id === 'seed-upper-body' ? { ...r, days: [todayIdx] } : r))
     d.history = [{ ...yesterdayWorkout(), id: 'w-today', start: Date.now() - 60000, end: Date.now() }]
     mount(d)
@@ -192,7 +198,7 @@ describe('planned days', () => {
   })
 
   it('does not auto-pick while a workout for another routine is running; the hero shows the running one', () => {
-    const d = defaultData()
+    const d = threeRoutines()
     d.activeRoutineId = 'seed-upper-body'
     d.autoPickDay = '2000-01-01'
     d.routines = d.routines.map((r) => (r.id === 'preset-full-body' ? { ...r, days: [todayIdx] } : r))
@@ -205,7 +211,7 @@ describe('planned days', () => {
   })
 
   it('with nothing planned today, the hero says there is no session, with no start button or up next', () => {
-    const d = defaultData()
+    const d = threeRoutines()
     d.routines = d.routines.map((r) => (r.id === 'preset-full-body' ? { ...r, days: [(todayIdx + 1) % 7] } : r))
     mount(d)
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('No session today')
@@ -215,7 +221,7 @@ describe('planned days', () => {
   })
 
   it('Home no longer shows Ready to progress suggestions', () => {
-    const d = defaultData()
+    const d = threeRoutines()
     const y = yesterdayWorkout()
     y.exercises[0].sets = [{ reps: 12, weight: 4, duration: 0 }, { reps: 12, weight: 4, duration: 0 }]
     d.history = [y]
@@ -224,7 +230,7 @@ describe('planned days', () => {
   })
 
   it('with two routines planned today, a pick from the hero chips sticks for the day', () => {
-    const d = defaultData()
+    const d = threeRoutines()
     d.autoPickDay = '2000-01-01'
     d.routines = d.routines.map((r) => (r.id !== 'seed-upper-body' ? { ...r, days: [todayIdx] } : r))
     const { unmount } = mount(d)
@@ -235,7 +241,7 @@ describe('planned days', () => {
   })
 
   it('routine detail: active strip on top, manage actions at the bottom, no set counts or day hint', () => {
-    mount()
+    mount(threeRoutines())
     fireEvent.click(tabbar().getByRole('button', { name: 'Routines' }))
     expect(screen.queryByText(/sets?/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Open Lower Body/ }))
@@ -255,8 +261,21 @@ describe('planned days', () => {
     expect(savedData().routines.map((r) => r.name)).not.toContain('Lower Body & Core (copy)')
   })
 
-  it('every routine with a planned day is active, so several can be active at once', () => {
+  it('the Restore built-in routines prompt can be hidden, and comes back when another built-in is deleted', () => {
     const d = defaultData()
+    mount({ ...d, routines: d.routines.filter((r) => r.id !== 'split-legs') })
+    fireEvent.click(tabbar().getByRole('button', { name: 'Routines' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide restore built-in routines' }))
+    expect(screen.queryByRole('button', { name: /Restore built-in routines/ })).toBeNull()
+    expect(savedData().restoreDismissed).toEqual(['split-legs'])
+    cleanup()
+    mount({ ...savedData(), routines: savedData().routines.filter((r) => r.id !== 'split-pull') })
+    fireEvent.click(tabbar().getByRole('button', { name: 'Routines' }))
+    expect(screen.getByRole('button', { name: /Restore built-in routines/ })).toBeTruthy()
+  })
+
+  it('every routine with a planned day is active, so several can be active at once', () => {
+    const d = threeRoutines()
     d.routines = d.routines.map((r) => (r.id === 'seed-upper-body' ? { ...r, days: [0] } : r.id === 'preset-full-body' ? { ...r, days: [2, 4] } : r))
     mount(d)
     fireEvent.click(tabbar().getByRole('button', { name: 'Routines' }))
@@ -266,14 +285,14 @@ describe('planned days', () => {
   })
 
   it('days set in the routine editor are saved', () => {
-    mount()
+    mount(threeRoutines())
     fireEvent.click(tabbar().getByRole('button', { name: 'Routines' }))
     fireEvent.click(screen.getByRole('button', { name: /Open Lower Body/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Tuesday' }))
     fireEvent.click(screen.getByRole('button', { name: 'Thursday' }))
     expect(screen.getByRole('button', { name: 'Tuesday' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: 'Thursday' }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByText(/Tue, Thu\. Shows first on Home/)).toBeTruthy()
+    expect(screen.getByText('Tue, Thu')).toBeTruthy()
     expect(savedData().routines.find((r) => r.id === 'preset-lower-core')!.days).toEqual([1, 3])
   })
 })

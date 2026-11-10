@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { bestWeekStreak, buildSteps, buildWorkout, computePRs, logKey, monthStats, restFor, weekStart, weekStreak, weeklyCounts } from './logic'
 import { seedRoutine } from './seed'
-import type { Session, Workout } from './types'
+import type { AppData, Session, Workout } from './types'
 
 const r = seedRoutine()
+/** Routine ids, minus the weekly split that v7 adds, so older migration tests check only what they set up. */
+const nonSplit = (d: AppData) => d.routines.map((x) => x.id).filter((id) => !id.startsWith('split-'))
 
 function fullSession(reps: (exIdx: number) => number, dur = 30): Session {
   const logs: Session['logs'] = {}
@@ -59,23 +61,89 @@ describe('weekStreak', () => {
 })
 
 describe('built-in routines', () => {
-  it('fresh install has 3 routines with globally unique ids', async () => {
+  it('fresh install has the starter routine plus the unplanned weekly split, with unique exercise ids per routine', async () => {
     const { defaultData } = await import('./seed')
     const d = defaultData()
-    expect(d.routines.map((x) => x.name)).toEqual(['Upper Body & Posture', 'Lower Body & Core', 'Full Body Express'])
-    const exIds = d.routines.flatMap((x) => x.exercises.map((e) => e.id))
-    expect(new Set(exIds).size).toBe(exIds.length)
-    for (const rt of d.routines) expect(buildSteps(rt).length).toBeGreaterThan(0)
+    expect(d.routines.map((x) => x.name)).toEqual(['Starter Routine', 'Push', 'Legs', 'Pull', 'Lower + Core', 'Upper Pump'])
+    expect(d.routines.every((x) => !x.days?.length)).toBe(true)
+    for (const rt of d.routines) {
+      const ids = rt.exercises.map((e) => e.id)
+      expect(new Set(ids).size).toBe(ids.length)
+      expect(buildSteps(rt).length).toBeGreaterThan(0)
+    }
   })
-  it('migration adds new presets once to existing data; deleted ones stay deleted', async () => {
-    const { withPresets, seedRoutine } = await import('./seed')
-    const { defaultSettings } = await import('./seed')
+
+  it('a lift in several built-in routines has one exercise id, so its PRs are compared across routines', async () => {
+    const { defaultData } = await import('./seed')
+    const byName = new Map<string, Set<string>>()
+    for (const e of defaultData().routines.flatMap((x) => x.exercises)) byName.set(e.name, (byName.get(e.name) ?? new Set()).add(e.id))
+    for (const [name, ids] of byName) expect([name, ids.size]).toEqual([name, 1])
+  })
+
+  it('v6 removes untouched Lower Body & Core and Full Body Express the user never used', async () => {
+    const { withPresets, seedRoutine, lowerBodyRoutine, fullBodyRoutine, defaultSettings } = await import('./seed')
+    const out = withPresets({ version: 1, routines: [seedRoutine(), lowerBodyRoutine(), fullBodyRoutine()], activeRoutineId: 'seed-upper-body', history: [], settings: defaultSettings(), presets: 5 })
+    expect(nonSplit(out)).toEqual(['seed-upper-body'])
+  })
+
+  it('v6 keeps untouched retired routines that are active, in history or planned on a day', async () => {
+    const { withPresets, seedRoutine, lowerBodyRoutine, fullBodyRoutine, defaultSettings } = await import('./seed')
+    const w = { id: 'w', routineId: 'preset-full-body', routineName: 'Full Body Express', start: 1, end: 2, exercises: [], prs: [] }
+    const base = { version: 1 as const, settings: defaultSettings(), presets: 5 }
+    const active = withPresets({ ...base, routines: [seedRoutine(), lowerBodyRoutine(), fullBodyRoutine()], activeRoutineId: 'preset-lower-core', history: [w] })
+    expect(nonSplit(active)).toEqual(['seed-upper-body', 'preset-lower-core', 'preset-full-body'])
+    expect(active.activeRoutineId).toBe('preset-lower-core')
+    expect(active.history).toEqual([w])
+    const planned = { ...lowerBodyRoutine(), days: [1, 3] }
+    const out = withPresets({ ...base, routines: [seedRoutine(), planned, fullBodyRoutine()], activeRoutineId: 'seed-upper-body', history: [] })
+    expect(nonSplit(out)).toEqual(['seed-upper-body', 'preset-lower-core'])
+    expect(out.routines[1].days).toEqual([1, 3])
+  })
+
+  it('split routines the user deleted are not re-added on later loads', async () => {
+    const { withPresets, defaultData } = await import('./seed')
+    const d = defaultData()
+    const trimmed = { ...d, routines: d.routines.filter((x) => x.id !== 'split-legs' && x.id !== 'split-pull') }
+    expect(withPresets(trimmed).routines.map((x) => x.id)).toEqual(['seed-upper-body', 'split-push', 'split-lower-core', 'split-upper-pump'])
+  })
+
+  it('v7 adds the weekly split unplanned, keeps the active routine and skips ones already there', async () => {
+    const { withPresets, seedRoutine, pushRoutine, defaultSettings } = await import('./seed')
+    const starter = { ...seedRoutine(), days: [0, 2, 4] }
+    const out = withPresets({ version: 1, routines: [starter, pushRoutine()], activeRoutineId: 'seed-upper-body', history: [], settings: defaultSettings(), presets: 6 })
+    expect(out.routines.map((x) => x.name)).toEqual(['Starter Routine', 'Push', 'Legs', 'Pull', 'Lower + Core', 'Upper Pump'])
+    expect(out.routines[0].days).toEqual([0, 2, 4])
+    expect(out.routines.slice(1).every((x) => !x.days?.length)).toBe(true)
+    expect(out.activeRoutineId).toBe('seed-upper-body')
+    expect(out.presets).toBe(8)
+  })
+
+  it('v8 renames past starter-routine workouts in history, leaving other workouts and the sets alone', async () => {
+    const { withPresets, seedRoutine, defaultSettings } = await import('./seed')
+    const sets = [{ reps: 10, weight: 4, duration: 0 }]
+    const ex = { exerciseId: 's1', name: 'Goblet squats', type: 'reps' as const, targetRepMax: 12, targetWeight: 4, targetDuration: 30, targetSets: 2, sets }
+    const old = { id: 'a', routineId: 'seed-upper-body', routineName: 'Upper Body & Posture', start: 1, end: 2, exercises: [ex], prs: [] }
+    const other = { id: 'b', routineId: 'preset-full-body', routineName: 'Full Body Express', start: 3, end: 4, exercises: [], prs: [] }
+    const out = withPresets({ version: 1, routines: [seedRoutine()], activeRoutineId: 'seed-upper-body', history: [old, other], settings: defaultSettings(), presets: 7 })
+    expect(out.history).toEqual([{ ...old, routineName: 'Starter Routine' }, other])
+  })
+
+  it('v6 keeps edited copies and one an in-progress session uses', async () => {
+    const { withPresets, seedRoutine, lowerBodyRoutine, fullBodyRoutine, defaultSettings } = await import('./seed')
+    const lower = lowerBodyRoutine()
+    const edited = { ...lower, exercises: lower.exercises.map((e, i) => (i === 0 ? { ...e, weight: 6 } : e)) }
+    const d = { version: 1 as const, routines: [seedRoutine(), edited, fullBodyRoutine()], activeRoutineId: 'seed-upper-body', history: [], settings: defaultSettings(), presets: 5 }
+    expect(nonSplit(withPresets(d))).toEqual(['seed-upper-body', 'preset-lower-core'])
+    expect(nonSplit(withPresets(d, 'preset-full-body'))).toEqual(['seed-upper-body', 'preset-lower-core', 'preset-full-body'])
+  })
+
+  it('very old data (v0) ends with the starter routine and the weekly split; deleted ones stay deleted', async () => {
+    const { withPresets, seedRoutine, defaultSettings } = await import('./seed')
     const old = { version: 1 as const, routines: [seedRoutine()], activeRoutineId: 'seed-upper-body', history: [], settings: defaultSettings() }
     const migrated = withPresets(old)
-    expect(migrated.routines).toHaveLength(3)
-    expect(migrated.activeRoutineId).toBe('seed-upper-body')
-    const deleted = { ...migrated, routines: migrated.routines.filter((x) => x.id !== 'preset-lower-core') }
-    expect(withPresets(deleted).routines).toHaveLength(2)
+    expect(migrated.routines.map((x) => x.id)).toEqual(['seed-upper-body', 'split-push', 'split-legs', 'split-pull', 'split-lower-core', 'split-upper-pump'])
+    const mine = { ...seedRoutine(), id: 'mine', name: 'Mine' }
+    expect(withPresets({ ...migrated, routines: [mine] }).routines.map((x) => x.id)).toEqual(['mine'])
   })
 })
 
@@ -88,6 +156,8 @@ describe('form guide detection', () => {
     expect(animFor({ name: 'Plank' })).toBe('plank')
     expect(animFor({ name: 'Side plank' })).toBe('sideplank')
     expect(animFor({ name: 'Pike push-ups' })).toBe('pike')
+    expect(animFor({ name: 'Overhead triceps extension' })).toBe('ohp')
+    expect(animFor({ name: 'Triceps kickbacks' })).toBe('kickback')
     expect(animFor({ name: 'Single-arm rows' })).toBe('row1')
     expect(animFor({ name: 'Mystery move' })).toBe('stand')
     expect(animFor({ name: 'Plank', illustration: 'none' })).toBeNull()
@@ -121,7 +191,7 @@ describe('break defaults', () => {
     expect(fb.exercises[0].rest).toBe(45)
     expect(fb.exercises.slice(1, 5).every((e) => e.rest === null)).toBe(true)
     expect(out.routines.find((r) => r.id === 'mine')!.exercises.every((e) => e.rest === 30)).toBe(true)
-    expect(out.presets).toBe(4)
+    expect(out.presets).toBe(8)
   })
 })
 
@@ -158,7 +228,7 @@ describe('v3 migration', () => {
     const { push, pull } = await oldPresets()
     const mine = { ...seedRoutine(), id: 'mine', name: 'Mine' }
     const out = withPresets({ version: 1, routines: [seedRoutine(), push, pull, mine], activeRoutineId: 'mine', history: [], settings: defaultSettings(), presets: 2 })
-    expect(out.routines.map((x) => x.id)).toEqual(['seed-upper-body', 'mine'])
+    expect(nonSplit(out)).toEqual(['seed-upper-body', 'mine'])
     expect(out.activeRoutineId).toBe('mine')
   })
 
@@ -174,7 +244,7 @@ describe('v3 migration', () => {
     expect(up.exercises.map((e) => e.id)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's8', 's7'])
     expect(up.exercises[1]).toMatchObject({ weight: 2, notes: 'mine' })
     expect(up.days).toEqual([0, 3])
-    expect(out.history).toEqual([w])
+    expect(out.history).toEqual([{ ...w, routineName: 'Starter Routine' }])
     expect(out.activeRoutineId).toBe('mine')
     expect(out.routines.find((r) => r.id === 'mine')).toEqual(mine)
     // runs once
@@ -192,12 +262,24 @@ describe('v3 migration', () => {
     expect(running).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'])
   })
 
+  it('v5 renames the starter routine only when it still has the old name, leaving its exercises alone', async () => {
+    const { withPresets, seedRoutine, defaultSettings } = await import('./seed')
+    const base = seedRoutine()
+    const old = { ...base, name: 'Upper Body & Posture', exercises: base.exercises.slice(0, 3) }
+    const custom = { ...base, name: 'My Upper Day' }
+    const d = (r: typeof base) => ({ version: 1 as const, routines: [r], activeRoutineId: r.id, history: [], settings: defaultSettings(), presets: 4 })
+    const out = withPresets(d(old)).routines[0]
+    expect(out.name).toBe('Starter Routine')
+    expect(out.exercises).toEqual(old.exercises)
+    expect(withPresets(d(custom)).routines[0].name).toBe('My Upper Day')
+  })
+
   it('keeps an untouched retired preset that is active or has history', async () => {
     const { withPresets, seedRoutine, defaultSettings } = await import('./seed')
     const { push, pull } = await oldPresets()
     const w = { id: 'w', routineId: 'preset-pull', routineName: 'Pull Day', start: 1, end: 2, exercises: [], prs: [] }
     const out = withPresets({ version: 1, routines: [seedRoutine(), push, pull], activeRoutineId: 'preset-push', history: [w], settings: defaultSettings(), presets: 2 })
-    expect(out.routines.map((x) => x.id)).toEqual(['seed-upper-body', 'preset-push', 'preset-pull'])
+    expect(nonSplit(out)).toEqual(['seed-upper-body', 'preset-push', 'preset-pull'])
     expect(out.activeRoutineId).toBe('preset-push')
   })
 
@@ -206,7 +288,7 @@ describe('v3 migration', () => {
     const { push, pull } = await oldPresets()
     const edited = { ...push, exercises: push.exercises.map((e, i) => (i === 0 ? { ...e, weight: 2 } : e)) }
     const out = withPresets({ version: 1, routines: [seedRoutine(), edited, pull], activeRoutineId: 'preset-push', history: [], settings: defaultSettings(), presets: 2 })
-    expect(out.routines.map((x) => x.id)).toEqual(['seed-upper-body', 'preset-push'])
+    expect(nonSplit(out)).toEqual(['seed-upper-body', 'preset-push'])
     expect(out.activeRoutineId).toBe('preset-push')
   })
 
@@ -214,7 +296,7 @@ describe('v3 migration', () => {
     const { withPresets, seedRoutine, defaultSettings } = await import('./seed')
     const { push, pull } = await oldPresets()
     const out = withPresets({ version: 1, routines: [seedRoutine(), push, pull], activeRoutineId: 'seed-upper-body', history: [], settings: defaultSettings(), presets: 2 }, 'preset-pull')
-    expect(out.routines.map((x) => x.id)).toEqual(['seed-upper-body', 'preset-pull'])
+    expect(nonSplit(out)).toEqual(['seed-upper-body', 'preset-pull'])
   })
 })
 
@@ -342,7 +424,7 @@ describe('planned days', () => {
     const { defaultData } = await import('./seed')
     const d = defaultData()
     const w: Workout = { id: 'h1', routineId: d.routines[0].id, routineName: 'x', start: 1, end: 2, exercises: [], prs: [] }
-    const raw = { ...d, history: [w], routines: [{ ...d.routines[0], days: [4, 0, 0, 9, -1, 2.5, 'x'] }, d.routines[1]] }
+    const raw = { ...d, history: [w], routines: [{ ...d.routines[0], days: [4, 0, 0, 9, -1, 2.5, 'x'] }, { ...d.routines[0], id: 'other' }] }
     const out = normalize(JSON.parse(JSON.stringify(raw)))
     expect(out.routines[0].days).toEqual([0, 4])
     expect(out.routines[1].days).toBeUndefined()
